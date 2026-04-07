@@ -1,0 +1,42 @@
+@namespace Frontend.Components.Shared
+
+@* §15.6 準拠 — 3 段階の在庫表示 *@
+
+<MudChip T="string"
+         Color="@StatusColor"
+         Size="Size.Small"
+         Variant="Variant.Filled"
+         Icon="@StatusIcon">
+    @StatusText
+</MudChip>
+
+@code {
+    [Parameter, EditorRequired]
+    public int StockQuantity { get; set; }
+
+    [Parameter]
+    public int LowStockThreshold { get; set; } = 5;
+
+    private Color StatusColor => StockQuantity switch
+    {
+        > 10 => Color.Success,
+        > 0 when StockQuantity <= LowStockThreshold => Color.Warning,
+        > 0 => Color.Info,
+        _ => Color.Error
+    };
+
+    private string StatusIcon => StockQuantity switch
+    {
+        > 10 => Icons.Material.Filled.CheckCircle,
+        > 0 => Icons.Material.Filled.Warning,
+        _ => Icons.Material.Filled.RemoveShoppingCart
+    };
+
+    private string StatusText => StockQuantity switch
+    {
+        > 10 => "在庫あり",
+        > 0 when StockQuantity <= LowStockThreshold => $"残りわずか（{StockQuantity}点）",
+        > 0 => $"残り{StockQuantity}点",
+        _ => "在庫切れ"
+    };
+}

@@ -1,0 +1,101 @@
+@page
+@model AdminPortal.Pages.Admin.Products.IndexModel
+@{
+    ViewData["Title"] = "商品管理";
+    Layout = "/Pages/Admin/_Layout.cshtml";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>商品管理</h2>
+    <a href="/Admin/Products/Create" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>新規登録</a>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+}
+
+<form method="get" class="row g-2 mb-4">
+    <div class="col-md-4">
+        <div class="input-group">
+            <input type="text" class="form-control" name="search" value="@Model.SearchKeyword"
+                   placeholder="商品名で検索..." />
+            <button type="submit" class="btn btn-outline-primary">
+                <i class="bi bi-search"></i>
+            </button>
+        </div>
+    </div>
+</form>
+
+<div class="table-responsive">
+    <table class="table table-dark table-striped table-hover">
+        <thead>
+            <tr>
+                <th>商品名</th>
+                <th>カテゴリ</th>
+                <th class="text-end">価格</th>
+                <th class="text-end">在庫</th>
+                <th>ステータス</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Products.Count == 0)
+            {
+                <tr><td colspan="6" class="text-center text-secondary py-4">商品データがありません</td></tr>
+            }
+            @foreach (var product in Model.Products)
+            {
+                <tr>
+                    <td>@product.Name</td>
+                    <td>@product.Category</td>
+                    <td class="text-end">¥@product.Price.ToString("N0")</td>
+                    <td class="text-end">@product.StockQuantity</td>
+                    <td>
+                        @if (product.IsActive)
+                        {
+                            <span class="badge bg-success">販売中</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">非公開</span>
+                        }
+                    </td>
+                    <td>
+                        <a href="/Admin/Products/Edit?id=@product.Id" class="btn btn-sm btn-outline-primary me-1">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <form method="post" asp-page-handler="Delete" class="d-inline"
+                              onsubmit="return confirm('この商品を削除しますか？');">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="productId" value="@product.Id" />
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (Model.TotalPages > 1)
+{
+    <nav aria-label="商品ページネーション">
+        <ul class="pagination justify-content-center">
+            <li class="page-item @(Model.CurrentPage <= 1 ? "disabled" : "")">
+                <a class="page-link" href="/Admin/Products?page=@(Model.CurrentPage - 1)&search=@Model.SearchKeyword">&laquo;</a>
+            </li>
+            @for (var i = 1; i <= Model.TotalPages; i++)
+            {
+                <li class="page-item @(i == Model.CurrentPage ? "active" : "")">
+                    <a class="page-link" href="/Admin/Products?page=@i&search=@Model.SearchKeyword">@i</a>
+                </li>
+            }
+            <li class="page-item @(Model.CurrentPage >= Model.TotalPages ? "disabled" : "")">
+                <a class="page-link" href="/Admin/Products?page=@(Model.CurrentPage + 1)&search=@Model.SearchKeyword">&raquo;</a>
+            </li>
+        </ul>
+    </nav>
+}

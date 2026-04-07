@@ -1,0 +1,215 @@
+@page "/mypage/activities"
+@rendermode @(RenderMode.InteractiveServer)
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject Frontend.Services.Interfaces.IApiGatewayClient ApiClient
+@inject ISnackbar Snackbar
+@inject ILogger<Frontend.Components.Pages.MyPage.Activities> Logger
+
+<PageTitle>アクティビティ履歴 — Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack"
+               Href="/mypage" Class="mb-4">
+        マイページに戻る
+    </MudButton>
+
+    <MudText Typo="Typo.h4" Class="mb-6" Style="font-weight: 700; color: #1565C0;">
+        <MudIcon Icon="@Icons.Material.Filled.History" Class="mr-2" />
+        アクティビティ履歴
+    </MudText>
+
+    <MudPaper Elevation="2" Class="pa-4 mb-4 rounded-lg">
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudSelect @bind-Value="_selectedActionType"
+                           Label="アクション種別"
+                           Variant="Variant.Outlined"
+                           Clearable="true"
+                           Dense="true">
+                    <MudSelectItem Value="@string.Empty">すべて</MudSelectItem>
+                    <MudSelectItem Value="@("LOGIN")">ログイン</MudSelectItem>
+                    <MudSelectItem Value="@("LOGOUT")">ログアウト</MudSelectItem>
+                    <MudSelectItem Value="@("PASSWORD_CHANGE")">パスワード変更</MudSelectItem>
+                    <MudSelectItem Value="@("PROFILE_UPDATE")">プロフィール更新</MudSelectItem>
+                    <MudSelectItem Value="@("ORDER_PLACED")">注文</MudSelectItem>
+                    <MudSelectItem Value="@("MFA_ENABLED")">MFA 有効化</MudSelectItem>
+                    <MudSelectItem Value="@("MFA_DISABLED")">MFA 無効化</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudDateRangePicker @bind-DateRange="_dateRange"
+                                   Label="期間"
+                                   Variant="Variant.Outlined"
+                                   Placeholder="期間を選択" />
+            </MudItem>
+            <MudItem xs="12" md="4" Class="d-flex align-end">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           OnClick="HandleFilterAsync"
+                           StartIcon="@Icons.Material.Filled.Search"
+                           Style="min-height: 40px;">
+                    検索
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudTable T="ActivityDto" ServerData="LoadActivitiesAsync" @ref="_table"
+              Dense="true" Hover="true" Elevation="2" Class="rounded-lg">
+        <HeaderContent>
+            <MudTh>日時</MudTh>
+            <MudTh>アクション種別</MudTh>
+            <MudTh>説明</MudTh>
+            <MudTh>IP アドレス</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="日時">
+                @context.OccurredAt.ToString("yyyy/MM/dd HH:mm:ss")
+            </MudTd>
+            <MudTd DataLabel="アクション種別">
+                <MudChip T="string" Size="Size.Small" Color="@GetActionColor(context.ActionType)"
+                         Icon="@GetActionIcon(context.ActionType)">
+                    @GetActionLabel(context.ActionType)
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="説明">@context.Description</MudTd>
+            <MudTd DataLabel="IP アドレス">
+                <MudText Typo="Typo.body2" Style="font-family: monospace;">
+                    @MaskIpAddress(context.IpAddress)
+                </MudText>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                アクティビティ履歴がありません。
+            </MudText>
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="@(new[] { 10, 20, 50 })" />
+        </PagerContent>
+    </MudTable>
+</MudContainer>
+
+@code {
+    private MudTable<ActivityDto>? _table;
+    private string _selectedActionType = string.Empty;
+    private DateRange? _dateRange;
+    private string? _userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var profile = await ApiClient.GetAsync<UserProfileDto>("/api/v1/users/me");
+            _userId = profile?.Id;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "ユーザー情報の取得に失敗: {Message}", ex.Message);
+        }
+    }
+
+    private async Task<TableData<ActivityDto>> LoadActivitiesAsync(TableState state, CancellationToken ct)
+    {
+        if (_userId is null)
+        {
+            return new TableData<ActivityDto> { Items = [], TotalItems = 0 };
+        }
+
+        try
+        {
+            var page = state.Page;
+            var size = state.PageSize;
+            var path = $"/api/v1/users/{_userId}/activities?page={page}&size={size}";
+
+            if (!string.IsNullOrEmpty(_selectedActionType))
+            {
+                path += $"&actionType={_selectedActionType}";
+            }
+
+            if (_dateRange?.Start is not null)
+            {
+                path += $"&from={_dateRange.Start.Value:yyyy-MM-dd}";
+            }
+
+            if (_dateRange?.End is not null)
+            {
+                path += $"&to={_dateRange.End.Value:yyyy-MM-dd}";
+            }
+
+            var result = await ApiClient.GetAsync<PaginatedResult<ActivityDto>>(path, ct);
+            if (result is not null)
+            {
+                return new TableData<ActivityDto>
+                {
+                    Items = result.Items,
+                    TotalItems = (int)result.TotalElements
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "アクティビティ履歴の読み込みに失敗: {Message}", ex.Message);
+            Snackbar.Add("アクティビティ履歴の読み込みに失敗しました", Severity.Error);
+        }
+
+        return new TableData<ActivityDto> { Items = [], TotalItems = 0 };
+    }
+
+    private async Task HandleFilterAsync()
+    {
+        if (_table is not null)
+        {
+            await _table.ReloadServerData();
+        }
+    }
+
+    private static string MaskIpAddress(string? ipAddress)
+    {
+        if (string.IsNullOrEmpty(ipAddress)) return "***.***.***";
+        var parts = ipAddress.Split('.');
+        if (parts.Length == 4)
+        {
+            return $"{parts[0]}.{parts[1]}.***. ***";
+        }
+        return "***.***.***";
+    }
+
+    private static string GetActionLabel(string actionType) => actionType.ToUpperInvariant() switch
+    {
+        "LOGIN" => "ログイン",
+        "LOGOUT" => "ログアウト",
+        "PASSWORD_CHANGE" => "パスワード変更",
+        "PROFILE_UPDATE" => "プロフィール更新",
+        "ORDER_PLACED" => "注文",
+        "MFA_ENABLED" => "MFA 有効化",
+        "MFA_DISABLED" => "MFA 無効化",
+        _ => actionType
+    };
+
+    private static Color GetActionColor(string actionType) => actionType.ToUpperInvariant() switch
+    {
+        "LOGIN" => Color.Success,
+        "LOGOUT" => Color.Default,
+        "PASSWORD_CHANGE" => Color.Warning,
+        "PROFILE_UPDATE" => Color.Info,
+        "ORDER_PLACED" => Color.Primary,
+        "MFA_ENABLED" => Color.Success,
+        "MFA_DISABLED" => Color.Error,
+        _ => Color.Default
+    };
+
+    private static string GetActionIcon(string actionType) => actionType.ToUpperInvariant() switch
+    {
+        "LOGIN" => Icons.Material.Filled.Login,
+        "LOGOUT" => Icons.Material.Filled.Logout,
+        "PASSWORD_CHANGE" => Icons.Material.Filled.Lock,
+        "PROFILE_UPDATE" => Icons.Material.Filled.Edit,
+        "ORDER_PLACED" => Icons.Material.Filled.ShoppingCart,
+        "MFA_ENABLED" => Icons.Material.Filled.Security,
+        "MFA_DISABLED" => Icons.Material.Filled.RemoveModerator,
+        _ => Icons.Material.Filled.Info
+    };
+
+    private record UserProfileDto(string Id, string Email, string Name, string? PhoneNumber, string Role, DateTime CreatedAt);
+    private record ActivityDto(string Id, string ActionType, string Description, string? IpAddress, DateTime OccurredAt);
+}

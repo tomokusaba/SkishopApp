@@ -1,0 +1,614 @@
+# ============================================================
+# SkiShop: 統合 docker-compose.yml
+# 外部インフラ + 全マイクロサービス + フロントエンドを一括起動
+#
+# 起動: docker compose up -d
+# 停止: docker compose down
+# 全削除（ボリューム含む）: docker compose down -v
+# ============================================================
+
+services:
+
+  # ==================== インフラ層 (Tier 0) ====================
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: skishop-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: skishop
+      POSTGRES_PASSWORD: skishop_dev_password
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init-databases.sql:/docker-entrypoint-initdb.d/01-init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skishop"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - skishop-network
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: skishop-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - skishop-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.7.1
+    container_name: skishop-kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    # Note: Volume disabled due to permission issues on ARM64/Apple Silicon
+    # volumes:
+    #   - kafka_data:/tmp/kraft-combined-logs
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - skishop-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: skishop-kafka-ui
+    restart: unless-stopped
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: skishop-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - skishop-network
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: skishop-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - skishop-network
+
+  # ==================== コアサービス層 (Tier 1) ====================
+
+  auth-service:
+    platform: linux/amd64
+    build:
+      context: ./Services
+      dockerfile: AuthService/Dockerfile
+    container_name: skishop-auth-service
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5001
+      - DOTNET_RUNNING_IN_CONTAINER=true
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=authdb;Username=skishop;Password=skishop_dev_password
+      - ConnectionStrings__Redis=redis:6379
+      - Kafka__BootstrapServers=kafka:29092
+      - Jwt__Issuer=https://skishop.local
+      - Jwt__Audience=skishop-api
+      - Jwt__SecretKey=dev-signing-key-minimum-32-characters-long
+      - Encryption__Key=MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - skishop-network
+
+  user-management-service:
+    platform: linux/amd64
+    build:
+      context: ./Services
+      dockerfile: UserManagementService/Dockerfile
+    container_name: skishop-user-management-service
+    restart: unless-stopped
+    ports:
+      - "5002:5002"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5002
+      - DOTNET_RUNNING_IN_CONTAINER=true
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=userdb;Username=skishop;Password=skishop_dev_password
+      - ConnectionStrings__Redis=redis:6379
+      - Kafka__BootstrapServers=kafka:29092
+      - Jwt__Issuer=https://skishop.local
+      - Jwt__Audience=skishop-api
+      - Jwt__SigningKey=dev-signing-key-minimum-32-characters-long
+      - DataExport__EncryptionKeyBase64=ZGV2LWVuY3J5cHRpb24ta2V5LWZvci10ZXN0aW5nLW9ubHk=
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - skishop-network
+
+  inventory-management-service:
+    platform: linux/amd64
+    build:
+      context: ./Services
+      dockerfile: InventoryManagementService/Dockerfile
+    container_name: skishop-inventory-management-service
+    restart: unless-stopped
+    ports:
+      - "5003:5003"
+      - "15003:15003"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5003;http://+:15003
+      - DOTNET_RUNNING_IN_CONTAINER=true
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=inventorydb;Username=skishop;Password=skishop_dev_password
+      - ConnectionStrings__Redis=redis:6379
+      - Kafka__BootstrapServers=kafka:29092
+      - Jwt__Issuer=https://skishop.local
+      - Jwt__Audience=skishop-api
+      - Jwt__SecretKey=dev-signing-key-minimum-32-characters-long
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - skishop-network
+
+  sales-management-service:
+    platform: linux/amd64
+    build:
+      context: ./Services
+      dockerfile: SalesManagementService/Dockerfile
+    container_name: skishop-sales-management-service
+    restart: unless-stopped
+    ports:
+      - "5004:5004"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5004
+      - DOTNET_RUNNING_IN_CONTAINER=true
+      - ConnectionStrings__salesdb=Host=postgres;Database=salesdb;Username=skishop;Password=skishop_dev_password
+      - ConnectionStrings__redis=redis:6379
+      - Kafka__BootstrapServers=kafka:29092
+      - Jwt__Issuer=https://skishop.local
+      - Jwt__Audience=skishop-api
+      - Jwt__SecretKey=dev-signing-key-minimum-32-characters-long
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - skishop-network
+
+  payment-cart-service:
+    platform: linux/amd64
+    build:
+      context: ./Services
+      dockerfile: PaymentCartService/Dockerfile
+    container_name: skishop-payment-cart-service
+    restart: unless-stopped
+    ports:
+      - "5005:5005"
+      - "15005:15005"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5005;http://+:15005
+      - DOTNET_RUNNING_IN_CONTAINER=true
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=cartdb;Username=skishop;Password=skishop_dev_password
+      - ConnectionStrings__Redis=redis:6379
+      - Kafka__BootstrapServers=kafka:29092
+      - Jwt__Issuer=https://skishop.local
+      - Jwt__Audience=skishop-api
+      - Jwt__Key=dev-signing-key-minimum-32-characters-long
+      - Stripe__SecretKey=sk_test_dev_placeholder_key_for_local_development
+      - Stripe__WebhookSecret=whsec_dev_placeholder_secret_for_local_development
+      - Stripe__SuccessUrl=http://localhost:3000/checkout/success
+      - Stripe__CancelUrl=http://localhost:3000/checkout/cancel
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - skishop-network
+
+  coupon-service:
+    platform: linux/amd64
+    build:
+      context: ./Services
+      dockerfile: CouponService/Dockerfile
+    container_name: skishop-coupon-service
+    restart: unless-stopped
+    ports:
+      - "5006:5006"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5006
+      - DOTNET_RUNNING_IN_CONTAINER=true
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=coupondb;Username=skishop;Password=skishop_dev_password
+      - ConnectionStrings__Redis=redis:6379
+      - Kafka__BootstrapServers=kafka:29092
+      - Jwt__SigningKey=dev-signing-key-minimum-32-characters-long
+      - Jwt__Issuer=https://skishop.local
+      - Jwt__Audience=skishop-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - skishop-network
+
+  point-service:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Services/PointService/Dockerfile
+    container_name: skishop-point-service
+    restart: unless-stopped
+    ports:
+      - "5007:5007"
+      - "15007:15007"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5007;http://+:15007
+      - DOTNET_RUNNING_IN_CONTAINER=true
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=pointdb;Username=skishop;Password=skishop_dev_password
+      - ConnectionStrings__Redis=redis:6379
+      - Kafka__BootstrapServers=kafka:29092
+      - Jwt__Issuer=https://skishop.local
+      - Jwt__Audience=skishop-api
+      - Jwt__SecretKey=dev-signing-key-minimum-32-characters-long
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5007/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - skishop-network
+
+  mailsend-service:
+    platform: linux/amd64
+    build:
+      context: ./Services
+      dockerfile: MailSendService/Dockerfile
+    container_name: skishop-mailsend-service
+    restart: unless-stopped
+    ports:
+      - "5008:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - DOTNET_RUNNING_IN_CONTAINER=true
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=mailsenddb;Username=skishop;Password=skishop_dev_password
+      - ConnectionStrings__Redis=redis:6379
+      - Kafka__BootstrapServers=kafka:29092
+      - Services__UserManagement__Url=http://user-management-service:8080
+      - Services__UserManagement__ApiKey=dev-api-key-for-user-management-service
+      - SendGrid__ApiKey=SG.dev-dummy-api-key-for-development-only
+      - SendGrid__BaseUrl=https://api.sendgrid.com
+      - Mail__BaseUrl=http://frontend:3000
+      - Jwt__Issuer=https://skishop.local
+      - Jwt__Audience=skishop-api
+      - Jwt__SecretKey=dev-signing-key-minimum-32-characters-long
+      - Jwt__ExpirationMinutes=60
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - skishop-network
+
+  ai-support-service:
+    platform: linux/amd64
+    build:
+      context: ./Services
+      dockerfile: AiSupportService/Dockerfile
+    container_name: skishop-ai-support-service
+    restart: unless-stopped
+    ports:
+      - "5009:5009"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5009
+      - DOTNET_RUNNING_IN_CONTAINER=true
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=aisupportdb;Username=skishop;Password=skishop_dev_password
+      - ConnectionStrings__Redis=redis:6379
+      - Kafka__BootstrapServers=kafka:29092
+      - Services__InventoryManagementService=http://inventory-management-service:5003
+      - Services__SalesManagementService=http://sales-management-service:5004
+      - Jwt__Issuer=https://skishop.local
+      - Jwt__Audience=skishop-api
+      - Jwt__SecretKey=${JWT_SECRET_KEY}
+      # Azure OpenAI / AI Search 設定（.env ファイルから読み込み）
+      - AzureOpenAI__Endpoint=${AZURE_OPENAI_ENDPOINT}
+      - AzureOpenAI__ApiKey=${AZURE_OPENAI_API_KEY}
+      - AzureOpenAI__DeploymentName=${AZURE_OPENAI_DEPLOYMENT_NAME}
+      - AzureOpenAI__EmbeddingDeploymentName=${AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME}
+      - AzureAISearch__Endpoint=${AZURE_AI_SEARCH_ENDPOINT}
+      - AzureAISearch__ApiKey=${AZURE_AI_SEARCH_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5009/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - skishop-network
+
+  # ==================== ゲートウェイ層 (Tier 2) ====================
+
+  api-gateway:
+    platform: linux/amd64
+    build:
+      context: ./Services
+      dockerfile: ApiGateway/Dockerfile
+    container_name: skishop-api-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - DOTNET_RUNNING_IN_CONTAINER=true
+      - Jwt__Issuer=https://skishop.local
+      - Jwt__Audience=skishop-api
+      - Jwt__SigningKey=dev-signing-key-minimum-32-characters-long
+      - Cors__AllowedOrigins__0=http://localhost:3000
+      - Cors__AllowedOrigins__1=http://frontend:8080
+      - Cors__AllowedOrigins__2=http://localhost:8081
+      - Cors__AllowedOrigins__3=http://admin-portal:8080
+      - Kafka__BootstrapServers=kafka:29092
+      - Redis__ConnectionString=redis:6379
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      user-management-service:
+        condition: service_healthy
+      inventory-management-service:
+        condition: service_healthy
+      sales-management-service:
+        condition: service_healthy
+      payment-cart-service:
+        condition: service_healthy
+      coupon-service:
+        condition: service_healthy
+      point-service:
+        condition: service_healthy
+      ai-support-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - skishop-network
+
+  # ==================== フロントエンド層 (Tier 3) ====================
+
+  frontend:
+    platform: linux/amd64
+    build:
+      context: ./Services
+      dockerfile: Frontend/Dockerfile
+    container_name: skishop-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - DOTNET_RUNNING_IN_CONTAINER=true
+      - ApiGateway__BaseUrl=http://api-gateway:8080
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - skishop-network
+
+  admin-portal:
+    platform: linux/amd64
+    build:
+      context: ./Services
+      dockerfile: AdminPortal/Dockerfile
+    container_name: skishop-admin-portal
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - DOTNET_RUNNING_IN_CONTAINER=true
+      - ApiGateway__BaseUrl=http://api-gateway:8080
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - skishop-network
+
+  # ==================== 管理ツール (Optional) ====================
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: skishop-pgadmin
+    restart: unless-stopped
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@skishop.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_LISTEN_PORT: 80
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - tools
+    networks:
+      - skishop-network
+
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: skishop-redisinsight
+    restart: unless-stopped
+    ports:
+      - "5540:5540"
+    volumes:
+      - redisinsight_data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles:
+      - tools
+    networks:
+      - skishop-network
+
+# ==================== ネットワーク ====================
+
+networks:
+  skishop-network:
+    driver: bridge
+    name: skishop-network
+
+# ==================== ボリューム ====================
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  kafka_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  redisinsight_data:
+    driver: local

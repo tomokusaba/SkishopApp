@@ -1,0 +1,27 @@
+@namespace Frontend.Components.Shared
+
+@if (ExpiringPoints > 0)
+{
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Filled" Dense="true"
+              Icon="@Icons.Material.Filled.Warning" role="alert" Class="mb-4">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center"
+                  Style="width: 100%;">
+            <MudText Typo="Typo.body2">
+                <strong>@ExpiringPoints.ToString("N0")</strong> ポイントが
+                <strong>@ExpiryDate.ToString("yyyy/MM/dd")</strong> に失効します
+            </MudText>
+            <MudLink Href="/products" Color="Color.Inherit" Underline="Underline.Always"
+                     Style="white-space: nowrap;">
+                ポイントを使って買い物する →
+            </MudLink>
+        </MudStack>
+    </MudAlert>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public int ExpiringPoints { get; set; }
+
+    [Parameter, EditorRequired]
+    public DateTime ExpiryDate { get; set; }
+}

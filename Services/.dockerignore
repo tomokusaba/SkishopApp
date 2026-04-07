@@ -1,0 +1,33 @@
+# Build artifacts
+**/bin/
+**/obj/
+**/out/
+
+# Test projects (not needed for runtime)
+**/*.Tests/
+
+# Node modules (frontend)
+**/node_modules/
+**/.next/
+
+# IDE files
+**/.idea/
+**/.vs/
+**/.vscode/
+
+# Git
+**/.git/
+**/.gitignore
+
+# Documentation
+**/*.md
+**/docs/
+
+# Test results
+**/TestResults/
+**/coverage/
+
+# Temporary files
+**/*.log
+**/*.tmp
+**/tmp/

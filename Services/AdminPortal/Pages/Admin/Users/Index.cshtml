@@ -1,0 +1,164 @@
+@page
+@model AdminPortal.Pages.Admin.Users.IndexModel
+@{
+    ViewData["Title"] = "ユーザー管理";
+    Layout = "/Pages/Admin/_Layout.cshtml";
+}
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="bi bi-people"></i> ユーザー管理</h1>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            @Model.StatusMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-8">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" name="SearchTerm" value="@Model.SearchTerm"
+                               placeholder="ユーザー名、メールアドレスで検索..." />
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary">検索</button>
+                    <a asp-page="/Admin/Users/Index" class="btn btn-outline-secondary">リセット</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ユーザー名</th>
+                            <th>メールアドレス</th>
+                            <th>ロール</th>
+                            <th>ステータス</th>
+                            <th>作成日</th>
+                            <th>最終ログイン</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Users.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">ユーザーが見つかりません。</td>
+                            </tr>
+                        }
+                        @foreach (var user in Model.Users)
+                        {
+                            <tr>
+                                <td>@user.UserName</td>
+                                <td>@user.Email</td>
+                                <td>
+                                    <span class="badge bg-@(user.Role == "Admin" ? "danger" : user.Role == "Manager" ? "warning" : "secondary")">
+                                        @user.Role
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (user.IsLocked)
+                                    {
+                                        <span class="badge bg-danger"><i class="bi bi-lock"></i> ロック中</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-success"><i class="bi bi-unlock"></i> 有効</span>
+                                    }
+                                </td>
+                                <td>@user.CreatedAt.ToString("yyyy/MM/dd")</td>
+                                <td>@(user.LastLoginAt?.ToString("yyyy/MM/dd HH:mm") ?? "—")</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button"
+                                                    data-bs-toggle="dropdown" aria-expanded="false">
+                                                ロール変更
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                @foreach (var role in new[] { "Admin", "Manager", "Staff", "User" })
+                                                {
+                                                    <li>
+                                                        <form method="post" asp-page-handler="UpdateRole">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="userId" value="@user.Id" />
+                                                            <input type="hidden" name="newRole" value="@role" />
+                                                            <button type="submit" class="dropdown-item @(user.Role == role ? "active" : "")">
+                                                                @role
+                                                            </button>
+                                                        </form>
+                                                    </li>
+                                                }
+                                            </ul>
+                                        </div>
+                                        @if (user.IsLocked)
+                                        {
+                                            <form method="post" asp-page-handler="Unlock" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="userId" value="@user.Id" />
+                                                <button type="submit" class="btn btn-sm btn-outline-success ms-1"
+                                                        title="ロック解除">
+                                                    <i class="bi bi-unlock"></i>
+                                                </button>
+                                            </form>
+                                        }
+                                        else
+                                        {
+                                            <form method="post" asp-page-handler="Lock" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="userId" value="@user.Id" />
+                                                <button type="submit" class="btn btn-sm btn-outline-danger ms-1"
+                                                        title="ロック"
+                                                        onclick="return confirm('このユーザーをロックしますか？')">
+                                                    <i class="bi bi-lock"></i>
+                                                </button>
+                                            </form>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (Model.TotalPages > 1)
+            {
+                <nav aria-label="ページナビゲーション">
+                    <ul class="pagination justify-content-center">
+                        <li class="page-item @(Model.CurrentPage <= 1 ? "disabled" : "")">
+                            <a class="page-link" asp-page="/Admin/Users/Index"
+                               asp-route-currentPage="@(Model.CurrentPage - 1)"
+                               asp-route-searchTerm="@Model.SearchTerm">前へ</a>
+                        </li>
+                        @for (var i = 1; i <= Model.TotalPages; i++)
+                        {
+                            <li class="page-item @(i == Model.CurrentPage ? "active" : "")">
+                                <a class="page-link" asp-page="/Admin/Users/Index"
+                                   asp-route-currentPage="@i"
+                                   asp-route-searchTerm="@Model.SearchTerm">@i</a>
+                            </li>
+                        }
+                        <li class="page-item @(Model.CurrentPage >= Model.TotalPages ? "disabled" : "")">
+                            <a class="page-link" asp-page="/Admin/Users/Index"
+                               asp-route-currentPage="@(Model.CurrentPage + 1)"
+                               asp-route-searchTerm="@Model.SearchTerm">次へ</a>
+                        </li>
+                    </ul>
+                </nav>
+            }
+        </div>
+    </div>
+</div>

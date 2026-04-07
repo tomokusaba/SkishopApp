@@ -1,0 +1,190 @@
+@page "/orders"
+@rendermode @(RenderMode.InteractiveServer)
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@inject IOrderApiClient OrderApi
+@inject IProductApiClient ProductApi
+@inject ICartApiClient CartApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject ILogger<Index> Logger
+
+<PageTitle>注文履歴 - Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4" />
+
+    <MudText Typo="Typo.h4" Class="mb-6" Style="font-weight: 700;">
+        <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2" /> 注文履歴
+    </MudText>
+
+    <MudTable @ref="_table"
+              ServerData="LoadOrdersAsync"
+              Hover="true"
+              Elevation="2"
+              Dense="true"
+              Style="border-radius: 12px;"
+              Loading="_isLoading"
+              LoadingProgressColor="Color.Primary"
+              RowsPerPage="10"
+              T="OrderDto">
+        <HeaderContent>
+            <MudTh>注文番号</MudTh>
+            <MudTh>注文日</MudTh>
+            <MudTh>ステータス</MudTh>
+            <MudTh Style="text-align: right;">商品数</MudTh>
+            <MudTh Style="text-align: right;">合計金額</MudTh>
+            <MudTh Style="text-align: center;">操作</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="注文番号">
+                <MudLink Href="@($"/orders/{context.Id}")" Color="Color.Primary" Underline="Underline.Hover">
+                    @context.OrderNumber
+                </MudLink>
+            </MudTd>
+            <MudTd DataLabel="注文日">@context.CreatedAt.ToString("yyyy/MM/dd HH:mm")</MudTd>
+            <MudTd DataLabel="ステータス">
+                <OrderStatusBadge Status="@context.Status" />
+            </MudTd>
+            <MudTd DataLabel="商品数" Style="text-align: right;">@context.Items.Count 点</MudTd>
+            <MudTd DataLabel="合計金額" Style="text-align: right; font-weight: 600;">
+                ¥@context.Total.ToString("N0")
+            </MudTd>
+            <MudTd DataLabel="操作" Style="text-align: center;">
+                <MudStack Row="true" Spacing="1" Justify="Justify.Center">
+                    <MudButton Variant="Variant.Outlined"
+                               Size="Size.Small"
+                               Color="Color.Primary"
+                               Href="@($"/orders/{context.Id}")"
+                               StartIcon="@Icons.Material.Filled.Visibility">
+                        詳細
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Size="Size.Small"
+                               Color="Color.Secondary"
+                               OnClick="@(() => ReorderAsync(context))"
+                               Disabled="_isReordering"
+                               StartIcon="@Icons.Material.Filled.Replay">
+                        再注文
+                    </MudButton>
+                </MudStack>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudPaper Elevation="0" Class="pa-8 text-center">
+                <MudIcon Icon="@Icons.Material.Filled.Inbox" Size="Size.Large" Color="Color.Default" Class="mb-4" />
+                <MudText Typo="Typo.h6" Class="mb-2">注文履歴がありません</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+                    商品を購入すると、ここに注文履歴が表示されます。
+                </MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/products"
+                           StartIcon="@Icons.Material.Filled.Search">
+                    商品を探す
+                </MudButton>
+            </MudPaper>
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 5, 10, 20 }"
+                           InfoFormat="{first_item}-{last_item} / {all_items} 件" />
+        </PagerContent>
+    </MudTable>
+</MudContainer>
+
+@code {
+    private MudTable<OrderDto>? _table;
+    private bool _isLoading;
+    private bool _isReordering;
+
+    private readonly List<BreadcrumbItem> _breadcrumbs =
+    [
+        new("ホーム", href: "/"),
+        new("注文履歴", href: null, disabled: true)
+    ];
+
+    private async Task<TableData<OrderDto>> LoadOrdersAsync(TableState state, CancellationToken ct)
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var orders = await OrderApi.GetCustomerOrdersAsync("me", state.Page, state.PageSize, ct);
+            return new TableData<OrderDto>
+            {
+                Items = orders,
+                TotalItems = orders.Count < state.PageSize ? (state.Page * state.PageSize) + orders.Count : (state.Page + 2) * state.PageSize
+            };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "注文履歴の取得に失敗しました");
+            Snackbar.Add("注文履歴の読み込みに失敗しました", Severity.Error);
+            return new TableData<OrderDto> { Items = [], TotalItems = 0 };
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ReorderAsync(OrderDto order)
+    {
+        _isReordering = true;
+        StateHasChanged();
+
+        try
+        {
+            var skippedItems = new List<string>();
+
+            var productTasks = order.Items
+                .Select(item => ProductApi.GetProductByIdAsync(item.ProductId))
+                .ToList();
+            var products = await Task.WhenAll(productTasks);
+
+            var cartItems = new List<AddCartItemRequest>();
+            for (var i = 0; i < order.Items.Count; i++)
+            {
+                var item = order.Items[i];
+                var product = products[i];
+                if (product is null || product.StockQuantity <= 0)
+                {
+                    skippedItems.Add(item.ProductName);
+                    continue;
+                }
+
+                var quantity = Math.Min(item.Quantity, product.StockQuantity);
+                cartItems.Add(new AddCartItemRequest(item.ProductId, quantity, item.Size, item.Color));
+            }
+
+            foreach (var cartItem in cartItems)
+            {
+                await CartApi.AddItemAsync(cartItem);
+            }
+
+            if (skippedItems.Count > 0)
+            {
+                Snackbar.Add($"以下の商品は在庫切れのためスキップしました: {string.Join(", ", skippedItems)}", Severity.Warning);
+            }
+
+            if (skippedItems.Count < order.Items.Count)
+            {
+                Snackbar.Add("カートに商品を追加しました", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("全ての商品が在庫切れです", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "再注文処理に失敗しました: OrderId={OrderId}", order.Id);
+            Snackbar.Add("再注文処理中にエラーが発生しました", Severity.Error);
+        }
+        finally
+        {
+            _isReordering = false;
+            StateHasChanged();
+        }
+    }
+}

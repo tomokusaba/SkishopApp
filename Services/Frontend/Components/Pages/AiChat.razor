@@ -1,0 +1,13 @@
+@page "/ai-chat"
+@inject IStringLocalizer<SharedResources> L
+
+<PageTitle>@L["Ai_Chat_Title"] - Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-6">
+    <MudText Typo="Typo.h4" GutterBottom="true">@L["Ai_Chat_Title"]</MudText>
+    <MudText Typo="Typo.body1" Class="mb-4" Color="Color.Secondary">
+        @L["Home_Feature_Ai_Desc"]
+    </MudText>
+
+    <Frontend.Components.Shared.AiChatWidget />
+</MudContainer>

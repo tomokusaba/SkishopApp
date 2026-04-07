@@ -1,0 +1,64 @@
+@page
+@model AdminPortal.Pages.Admin.Inventory.IndexModel
+@{
+    ViewData["Title"] = "在庫管理";
+    Layout = "/Pages/Admin/_Layout.cshtml";
+}
+
+<h2 class="mb-4">在庫管理</h2>
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+}
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="alert alert-success" role="alert">@Model.SuccessMessage</div>
+}
+
+<div class="table-responsive">
+    <table class="table table-dark table-striped table-hover">
+        <thead>
+            <tr>
+                <th>商品名</th>
+                <th class="text-end">現在庫数</th>
+                <th class="text-end">閾値</th>
+                <th>ステータス</th>
+                <th>在庫更新</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <tr><td colspan="5" class="text-center text-secondary py-4">在庫データがありません</td></tr>
+            }
+            @foreach (var item in Model.Items)
+            {
+                <tr class="@(item.IsLowStock ? "table-warning" : "")">
+                    <td>@item.ProductName</td>
+                    <td class="text-end">@item.CurrentStock</td>
+                    <td class="text-end">@item.ThresholdQuantity</td>
+                    <td>
+                        @if (item.IsLowStock)
+                        {
+                            <span class="badge bg-danger"><i class="bi bi-exclamation-triangle me-1"></i>在庫不足</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-success">正常</span>
+                        }
+                    </td>
+                    <td>
+                        <form method="post" asp-page-handler="UpdateStock" class="d-flex gap-2 align-items-center">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="UpdateProductId" value="@item.ProductId" />
+                            <input type="number" class="form-control form-control-sm" name="UpdateQuantity"
+                                   style="width: 100px" min="0" value="@item.CurrentStock" />
+                            <button type="submit" class="btn btn-sm btn-outline-primary">更新</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

@@ -1,0 +1,91 @@
+@* Checkout step indicator with aria-current="step" *@
+
+<nav aria-label="チェックアウトステップ" class="step-indicator">
+    <ol class="step-list">
+        @for (var i = 1; i <= 5; i++)
+        {
+            var stepNum = i;
+            var isCompleted = stepNum < CurrentStep;
+            var isCurrent = stepNum == CurrentStep;
+            <li class="step-item @(isCompleted ? "completed" : "") @(isCurrent ? "current" : "")"
+                aria-current="@(isCurrent ? "step" : null)"
+                aria-label="@($"ステップ {stepNum}/5: {GetStepLabel(stepNum)}{(isCompleted ? " — 完了" : "")}")">
+                <div class="step-circle">
+                    @if (isCompleted)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                    }
+                    else
+                    {
+                        <span>@stepNum</span>
+                    }
+                </div>
+                <span class="step-label">@GetStepLabel(stepNum)</span>
+            </li>
+        }
+    </ol>
+</nav>
+
+<style>
+    .step-indicator { margin-bottom: 2rem; }
+    .step-list {
+        display: flex;
+        justify-content: space-between;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        counter-reset: step;
+        position: relative;
+    }
+    .step-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1;
+        position: relative;
+        text-align: center;
+    }
+    .step-item:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        top: 18px;
+        left: 50%;
+        width: 100%;
+        height: 2px;
+        background: #e0e0e0;
+        z-index: 0;
+    }
+    .step-item.completed:not(:last-child)::after { background: #1565C0; }
+    .step-circle {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #e0e0e0;
+        color: #666;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        z-index: 1;
+        position: relative;
+    }
+    .step-item.completed .step-circle { background: #1565C0; color: white; }
+    .step-item.current .step-circle { background: #0D47A1; color: white; box-shadow: 0 0 0 4px rgba(21,101,192,0.2); }
+    .step-label { font-size: 0.75rem; margin-top: 0.5rem; color: #666; }
+    .step-item.current .step-label { color: #0D47A1; font-weight: 700; }
+    .step-item.completed .step-label { color: #1565C0; }
+</style>
+
+@code {
+    [Parameter] public int CurrentStep { get; set; } = 1;
+
+    private static string GetStepLabel(int step) => step switch
+    {
+        1 => "カート確認",
+        2 => "配送先",
+        3 => "お支払い",
+        4 => "注文確認",
+        5 => "完了",
+        _ => ""
+    };
+}

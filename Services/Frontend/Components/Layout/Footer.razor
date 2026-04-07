@@ -1,0 +1,47 @@
+@inject IStringLocalizer<SharedResources> L
+
+<MudPaper Class="mt-8 pa-8 skishop-footer" Elevation="0" Square="true">
+    <MudContainer MaxWidth="MaxWidth.Large">
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudText Typo="Typo.h6" Class="mb-2" Style="color: white;">
+                    <MudIcon Icon="@Icons.Material.Filled.AcUnit" Class="mr-1" />
+                    @L["Footer_Company"]
+                </MudText>
+                <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.7);">
+                    @L["Footer_Company_Desc"]
+                </MudText>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudText Typo="Typo.subtitle1" Class="mb-2" Style="color: white;">@L["Footer_Legal"]</MudText>
+                <MudLink Href="/legal/tokushoho" Style="color: rgba(255,255,255,0.7);" Underline="Underline.Hover">
+                    @L["Legal_Tokushoho"]
+                </MudLink>
+                <br />
+                <MudLink Href="/legal/privacy" Style="color: rgba(255,255,255,0.7);" Underline="Underline.Hover">
+                    @L["Legal_Privacy"]
+                </MudLink>
+                <br />
+                <MudLink Href="/legal/terms" Style="color: rgba(255,255,255,0.7);" Underline="Underline.Hover">
+                    @L["Legal_Terms"]
+                </MudLink>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudText Typo="Typo.subtitle1" Class="mb-2" Style="color: white;">@L["Footer_Support"]</MudText>
+                <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.7);">
+                    support&#64;skishop.example.com
+                </MudText>
+            </MudItem>
+        </MudGrid>
+        <MudDivider Class="my-4" Style="border-color: rgba(255,255,255,0.2);" />
+        <MudText Typo="Typo.body2" Align="Align.Center" Style="color: rgba(255,255,255,0.5);">
+            @L["Footer_Copyright"]
+        </MudText>
+    </MudContainer>
+</MudPaper>
+
+<style>
+    .skishop-footer {
+        background: linear-gradient(135deg, #0D47A1 0%, #1565C0 50%, #1976D2 100%);
+    }
+</style>

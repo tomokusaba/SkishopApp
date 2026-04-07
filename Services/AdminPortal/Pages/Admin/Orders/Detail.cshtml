@@ -1,0 +1,111 @@
+@page
+@model AdminPortal.Pages.Admin.Orders.DetailModel
+@{
+    ViewData["Title"] = "注文詳細";
+    Layout = "/Pages/Admin/_Layout.cshtml";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>注文詳細</h2>
+    <a href="/Admin/Orders" class="btn btn-outline-secondary">← 一覧に戻る</a>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+}
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="alert alert-success" role="alert">@Model.SuccessMessage</div>
+}
+
+@if (Model.Order is not null)
+{
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="card bg-dark border-secondary">
+                <div class="card-header">注文情報</div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">注文ID</dt>
+                        <dd class="col-sm-8"><code>@Model.Order.Id</code></dd>
+                        <dt class="col-sm-4">注文日</dt>
+                        <dd class="col-sm-8">@Model.Order.OrderDate.ToString("yyyy/MM/dd HH:mm")</dd>
+                        <dt class="col-sm-4">ステータス</dt>
+                        <dd class="col-sm-8"><span class="badge bg-info">@Model.Order.Status</span></dd>
+                        <dt class="col-sm-4">合計金額</dt>
+                        <dd class="col-sm-8 fw-bold">¥@Model.Order.TotalAmount.ToString("N0")</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card bg-dark border-secondary">
+                <div class="card-header">顧客情報</div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">氏名</dt>
+                        <dd class="col-sm-8">@Model.Order.CustomerName</dd>
+                        <dt class="col-sm-4">メール</dt>
+                        <dd class="col-sm-8">@Model.Order.CustomerEmail</dd>
+                        <dt class="col-sm-4">配送先</dt>
+                        <dd class="col-sm-8">@(Model.Order.ShippingAddress ?? "-")</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card bg-dark border-secondary mb-4">
+        <div class="card-header">ステータス更新</div>
+        <div class="card-body">
+            <form method="post" asp-page-handler="UpdateStatus" class="d-flex gap-2 align-items-center">
+                @Html.AntiForgeryToken()
+                <select class="form-select" asp-for="NewStatus" style="width: auto">
+                    <option value="">-- 選択 --</option>
+                    <option value="Processing">Processing（処理中）</option>
+                    <option value="Shipped">Shipped（発送済）</option>
+                    @if (Model.IsManagerOrAbove)
+                    {
+                        <option value="Pending">Pending（保留中）</option>
+                        <option value="Delivered">Delivered（配達完了）</option>
+                        <option value="Cancelled">Cancelled（キャンセル）</option>
+                        <option value="Refunded">Refunded（返金済）</option>
+                    }
+                </select>
+                <button type="submit" class="btn btn-primary">更新</button>
+            </form>
+        </div>
+    </div>
+
+    <h4 class="mb-3">注文明細</h4>
+    <div class="table-responsive">
+        <table class="table table-dark table-striped">
+            <thead>
+                <tr>
+                    <th>商品名</th>
+                    <th class="text-end">単価</th>
+                    <th class="text-end">数量</th>
+                    <th class="text-end">小計</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.Order.Items)
+                {
+                    <tr>
+                        <td>@item.ProductName</td>
+                        <td class="text-end">¥@item.UnitPrice.ToString("N0")</td>
+                        <td class="text-end">@item.Quantity</td>
+                        <td class="text-end">¥@item.SubTotal.ToString("N0")</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr class="fw-bold">
+                    <td colspan="3" class="text-end">合計</td>
+                    <td class="text-end">¥@Model.Order.TotalAmount.ToString("N0")</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+}

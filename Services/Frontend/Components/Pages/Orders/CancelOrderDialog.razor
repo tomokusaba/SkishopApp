@@ -1,0 +1,42 @@
+@namespace Frontend.Components.Pages.Orders
+
+<MudDialog role="alertdialog">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" />
+            <MudText Typo="Typo.h6">注文キャンセルの確認</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudText Class="mb-4">
+            注文番号 <strong>@OrderNumber</strong> をキャンセルしますか？この操作は取り消せません。
+        </MudText>
+        <MudSelect T="string" @bind-Value="_selectedReason" Label="キャンセル理由" Variant="Variant.Outlined"
+                   Required="true" RequiredError="キャンセル理由を選択してください">
+            <MudSelectItem T="string" Value="@("注文間違い")">注文間違い</MudSelectItem>
+            <MudSelectItem T="string" Value="@("不要になった")">不要になった</MudSelectItem>
+            <MudSelectItem T="string" Value="@("別の商品を購入したい")">別の商品を購入したい</MudSelectItem>
+            <MudSelectItem T="string" Value="@("配送先を変更したい")">配送先を変更したい</MudSelectItem>
+            <MudSelectItem T="string" Value="@("その他")">その他</MudSelectItem>
+        </MudSelect>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">戻る</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="Submit"
+                   Disabled="@(string.IsNullOrEmpty(_selectedReason))">
+            キャンセルする
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public string OrderNumber { get; set; } = string.Empty;
+
+    private string? _selectedReason;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(_selectedReason));
+}

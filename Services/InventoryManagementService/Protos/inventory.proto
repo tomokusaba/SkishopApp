@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+option csharp_namespace = "InventoryManagementService.Protos";
+
+package skishop.inventory;
+
+service InventoryService {
+  // Saga ステップ 2: 在庫予約
+  rpc ReserveInventory (ReserveInventoryRequest) returns (ReserveInventoryResponse);
+  // Saga 補償: 在庫解放
+  rpc ReleaseReservation (ReleaseReservationRequest) returns (ReleaseReservationResponse);
+  // 単一商品の在庫確認
+  rpc CheckStock (CheckStockRequest) returns (StockResponse);
+  // 複数商品の一括在庫確認
+  rpc CheckStockBatch (CheckStockBatchRequest) returns (StockBatchResponse);
+  // 在庫変動のリアルタイム通知（Server Streaming）
+  rpc SubscribeStockUpdates (StockSubscriptionRequest) returns (stream StockUpdate);
+}
+
+// ReserveInventory messages
+message ReserveInventoryRequest {
+  string order_id = 1;
+  repeated ReserveItem items = 2;
+}
+
+message ReserveItem {
+  string product_id = 1;
+  int32 quantity = 2;
+}
+
+message ReserveInventoryResponse {
+  bool success = 1;
+  string reservation_id = 2;
+  string error_message = 3;
+}
+
+// ReleaseReservation messages
+message ReleaseReservationRequest {
+  string order_id = 1;
+  string reservation_id = 2;
+  repeated ReserveItem items = 3;
+}
+
+message ReleaseReservationResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+// CheckStock messages
+message CheckStockRequest {
+  string product_id = 1;
+  int32 required_quantity = 2;
+}
+
+message StockResponse {
+  string product_id = 1;
+  int32 available_quantity = 2;
+  bool is_in_stock = 3;
+  bool can_fulfill_request = 4;
+  string estimated_restock_date = 5;
+}
+
+// CheckStockBatch messages
+message CheckStockBatchRequest {
+  repeated CheckStockRequest items = 1;
+}
+
+message StockBatchResponse {
+  repeated StockResponse items = 1;
+  bool all_items_available = 2;
+}
+
+// SubscribeStockUpdates messages
+message StockSubscriptionRequest {
+  repeated string product_ids = 1;
+  bool include_price_updates = 2;
+}
+
+message StockUpdate {
+  string product_id = 1;
+  int32 available_quantity = 2;
+  int64 current_price_sen = 3;
+  string update_timestamp = 4;
+  StockUpdateType update_type = 5;
+}
+
+enum StockUpdateType {
+  QUANTITY_CHANGED = 0;
+  PRICE_CHANGED = 1;
+  PRODUCT_UNAVAILABLE = 2;
+  PRODUCT_AVAILABLE = 3;
+}

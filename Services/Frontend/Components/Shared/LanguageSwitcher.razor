@@ -1,0 +1,37 @@
+@inject IStringLocalizer<SharedResources> L
+@inject NavigationManager Navigation
+
+<MudMenu Icon="@Icons.Material.Filled.Language"
+         Color="Color.Inherit"
+         AnchorOrigin="Origin.BottomCenter"
+         TransformOrigin="Origin.TopCenter"
+         Dense="true"
+         aria-label="@L["Language_Switch"]">
+    <MudMenuItem OnClick="@(() => SwitchLanguage("ja"))">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudText Typo="Typo.body2">🇯🇵</MudText>
+            <MudText Typo="Typo.body2">@L["Language_Ja"]</MudText>
+        </MudStack>
+    </MudMenuItem>
+    <MudMenuItem OnClick="@(() => SwitchLanguage("en"))">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudText Typo="Typo.body2">🇺🇸</MudText>
+            <MudText Typo="Typo.body2">@L["Language_En"]</MudText>
+        </MudStack>
+    </MudMenuItem>
+</MudMenu>
+
+@code {
+    private void SwitchLanguage(string culture)
+    {
+        var uri = new Uri(Navigation.Uri);
+        var newUri = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(
+            uri.GetLeftPart(UriPartial.Path),
+            new Dictionary<string, string?>
+            {
+                ["culture"] = culture,
+                ["ui-culture"] = culture
+            });
+        Navigation.NavigateTo(newUri, forceLoad: true);
+    }
+}

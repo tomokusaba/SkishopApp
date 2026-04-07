@@ -1,0 +1,117 @@
+@page "/checkout/shipping"
+@rendermode @(RenderMode.InteractiveServer)
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject ILogger<Shipping> Logger
+
+<PageTitle>配送先入力 - チェックアウト - Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <Frontend.Components.Shared.StepIndicator CurrentStep="2" />
+
+    <MudText Typo="Typo.h5" Class="mb-4" Style="font-weight: 700;">配送先の入力</MudText>
+
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Elevation="2" Class="pa-6" Style="border-radius: 12px;">
+                <EditForm Model="_shippingForm" OnValidSubmit="ProceedToPayment">
+                    <DataAnnotationsValidator />
+
+                    <MudText Typo="Typo.subtitle1" Class="mb-3" Style="font-weight: 600;">配送先住所</MudText>
+                    <MudGrid>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_shippingForm.FullName" Label="氏名" Required="true"
+                                          Variant="Variant.Outlined" For="@(() => _shippingForm.FullName)" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudTextField @bind-Value="_shippingForm.PostalCode" Label="郵便番号" Required="true"
+                                          Variant="Variant.Outlined" Placeholder="123-4567"
+                                          For="@(() => _shippingForm.PostalCode)" />
+                        </MudItem>
+                        <MudItem xs="12" sm="8">
+                            <MudTextField @bind-Value="_shippingForm.Prefecture" Label="都道府県" Required="true"
+                                          Variant="Variant.Outlined" For="@(() => _shippingForm.Prefecture)" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_shippingForm.City" Label="市区町村" Required="true"
+                                          Variant="Variant.Outlined" For="@(() => _shippingForm.City)" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_shippingForm.AddressLine1" Label="番地" Required="true"
+                                          Variant="Variant.Outlined" For="@(() => _shippingForm.AddressLine1)" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_shippingForm.AddressLine2" Label="建物名・部屋番号（任意）"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_shippingForm.PhoneNumber" Label="電話番号" Required="true"
+                                          Variant="Variant.Outlined" For="@(() => _shippingForm.PhoneNumber)" />
+                        </MudItem>
+                    </MudGrid>
+
+                    <MudText Typo="Typo.subtitle1" Class="mt-6 mb-3" Style="font-weight: 600;">配送方法</MudText>
+                    <MudRadioGroup @bind-Value="_shippingForm.ShippingMethod">
+                        <MudRadio T="string" Value="@("standard")" Color="Color.Primary">
+                            標準配送（3-5 営業日）
+                        </MudRadio>
+                        <MudRadio T="string" Value="@("express")" Color="Color.Primary">
+                            お急ぎ便（1-2 営業日） +¥330
+                        </MudRadio>
+                    </MudRadioGroup>
+
+                    <div style="display: flex; justify-content: space-between; margin-top: 2rem;">
+                        <MudButton Variant="Variant.Text" Color="Color.Default"
+                                   OnClick="@(() => Navigation.NavigateTo("/checkout/cart"))"
+                                   StartIcon="@Icons.Material.Filled.ArrowBack">
+                            カート確認に戻る
+                        </MudButton>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" ButtonType="ButtonType.Submit"
+                                   EndIcon="@Icons.Material.Filled.ArrowForward">
+                            お支払いへ進む
+                        </MudButton>
+                    </div>
+                </EditForm>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    private ShippingFormModel _shippingForm = new();
+
+    private void ProceedToPayment()
+    {
+        Navigation.NavigateTo("/checkout/payment");
+    }
+
+    private class ShippingFormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "氏名は必須です")]
+        [System.ComponentModel.DataAnnotations.StringLength(100)]
+        public string FullName { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "郵便番号は必須です")]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^\d{3}-?\d{4}$", ErrorMessage = "正しい郵便番号を入力してください")]
+        public string PostalCode { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "都道府県は必須です")]
+        public string Prefecture { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "市区町村は必須です")]
+        public string City { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "番地は必須です")]
+        public string AddressLine1 { get; set; } = string.Empty;
+
+        public string? AddressLine2 { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "電話番号は必須です")]
+        [System.ComponentModel.DataAnnotations.Phone(ErrorMessage = "正しい電話番号を入力してください")]
+        public string PhoneNumber { get; set; } = string.Empty;
+
+        public string ShippingMethod { get; set; } = "standard";
+    }
+}

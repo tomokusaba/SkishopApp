@@ -1,0 +1,126 @@
+@page "/checkout/cart"
+@rendermode @(RenderMode.InteractiveServer)
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@inject ICartApiClient CartApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject ILogger<CartReview> Logger
+
+<PageTitle>カート確認 - チェックアウト - Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <Frontend.Components.Shared.StepIndicator CurrentStep="1" />
+
+    @if (_isLoading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_cart is null || _cart.Items.Count == 0)
+    {
+        <MudAlert Severity="Severity.Warning">カートが空です。商品を追加してください。</MudAlert>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/products" Class="mt-4">商品一覧へ</MudButton>
+    }
+    else
+    {
+        <MudText Typo="Typo.h5" Class="mb-4" Style="font-weight: 700;">カート内容の確認</MudText>
+
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudTable Items="@_cart.Items" Hover="true" Dense="true" Elevation="2" Style="border-radius: 12px;">
+                    <HeaderContent>
+                        <MudTh>商品</MudTh>
+                        <MudTh>数量</MudTh>
+                        <MudTh Style="text-align: right;">小計</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <MudImage Src="@(context.ImageUrl ?? "/images/no-image.webp")" Alt="@context.ProductName"
+                                          Width="48" Height="48" ObjectFit="ObjectFit.Contain"
+                                          Style="border-radius: 4px; background: #f5f5f5;" />
+                                <div>
+                                    <MudText Typo="Typo.body1">@context.ProductName</MudText>
+                                    @if (!string.IsNullOrEmpty(context.Size))
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">サイズ: @context.Size</MudText>
+                                    }
+                                </div>
+                            </div>
+                        </MudTd>
+                        <MudTd>@context.Quantity</MudTd>
+                        <MudTd Style="text-align: right;">¥@context.Subtotal.ToString("N0")</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudPaper Elevation="2" Class="pa-4" Style="border-radius: 12px;">
+                    <MudText Typo="Typo.subtitle1" Class="mb-3" Style="font-weight: 600;">注文サマリー</MudText>
+                    <div class="summary-row"><span>小計（税抜）</span><span>¥@_cart.Subtotal.ToString("N0")</span></div>
+                    <div class="summary-row"><span>消費税（10%）</span><span>¥@_cart.Tax.ToString("N0")</span></div>
+                    <div class="summary-row">
+                        <span>送料</span>
+                        <span style="@(_cart.ShippingFee == 0 ? "color: #2e7d32;" : "")">
+                            @(_cart.ShippingFee == 0 ? "無料" : $"¥{_cart.ShippingFee:N0}")
+                        </span>
+                    </div>
+                    @if (_cart.CouponDiscount > 0)
+                    {
+                        <div class="summary-row" style="color: #d32f2f;"><span>クーポン割引</span><span>-¥@_cart.CouponDiscount.ToString("N0")</span></div>
+                    }
+                    <MudDivider Class="my-3" />
+                    <div class="summary-row total"><span>合計（税込）</span><span>¥@_cart.Total.ToString("N0")</span></div>
+
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                               Size="Size.Large" Class="mt-4"
+                               OnClick="@(() => Navigation.NavigateTo("/checkout/shipping"))"
+                               EndIcon="@Icons.Material.Filled.ArrowForward">
+                        配送先入力へ進む
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Text" Color="Color.Default" FullWidth="true" Class="mt-2"
+                               Href="/cart">
+                        カートに戻る
+                    </MudButton>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+<style>
+    .summary-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 0;
+        font-size: 0.95rem;
+    }
+    .summary-row.total {
+        font-weight: 700;
+        font-size: 1.2rem;
+        color: #0D47A1;
+    }
+</style>
+
+@code {
+    private CartDto? _cart;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _cart = await CartApi.GetCartAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "カート確認画面読み込みエラー");
+            Snackbar.Add("カートの読み込みに失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

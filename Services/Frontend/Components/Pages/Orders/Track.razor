@@ -1,0 +1,241 @@
+@page "/orders/track"
+@rendermode @(RenderMode.InteractiveServer)
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+
+@inject IShipmentReturnApiClient ShipmentReturnApi
+@inject ISnackbar Snackbar
+@inject ILogger<Track> Logger
+
+<PageTitle>注文追跡 - Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
+    <MudText Typo="Typo.h4" Class="mb-2 text-center" Style="font-weight: 700;">
+        <MudIcon Icon="@Icons.Material.Filled.Search" Class="mr-2" />注文の追跡
+    </MudText>
+    <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-6 text-center">
+        注文番号とメールアドレスを入力して、注文状況を確認できます。
+    </MudText>
+
+    @* Search Form *@
+    <MudPaper Elevation="2" Class="pa-6 mb-6" Style="border-radius: 12px;">
+        <MudStack Spacing="3">
+            <MudTextField T="string" @bind-Value="_orderNumber"
+                          Label="注文番号"
+                          Variant="Variant.Outlined"
+                          Required="true"
+                          RequiredError="注文番号を入力してください"
+                          Placeholder="例: ORD-20260101-XXXXX"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Receipt" />
+
+            <MudTextField T="string" @bind-Value="_email"
+                          Label="メールアドレス"
+                          Variant="Variant.Outlined"
+                          InputType="InputType.Email"
+                          Required="true"
+                          RequiredError="メールアドレスを入力してください"
+                          Placeholder="ご注文時のメールアドレス"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Email" />
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       OnClick="SearchOrderAsync"
+                       Disabled="_isSearching"
+                       StartIcon="@Icons.Material.Filled.Search"
+                       Size="Size.Large">
+                @if (_isSearching)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>検索中...</span>
+                }
+                else
+                {
+                    <span>注文を検索</span>
+                }
+            </MudButton>
+
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center">
+                <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="mr-1" />
+                検索は1分間に5回まで
+            </MudText>
+        </MudStack>
+    </MudPaper>
+
+    @* Validation Error *@
+    @if (_validationError is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@_validationError</MudAlert>
+    }
+
+    @* Not Found *@
+    @if (_searchPerformed && _order is null && _validationError is null)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-4" role="alert">
+            注文が見つかりません。注文番号とメールアドレスをご確認のうえ、再度お試しください。
+        </MudAlert>
+    }
+
+    @* Search Results *@
+    @if (_order is not null)
+    {
+        <MudPaper Elevation="2" Class="pa-6 mb-4" Style="border-radius: 12px;">
+            <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">注文情報</MudText>
+
+            <MudStack Spacing="2">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.body1">注文番号</MudText>
+                    <MudText Typo="Typo.body1" Style="font-weight: 600;">@_order.OrderNumber</MudText>
+                </MudStack>
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.body1">注文日</MudText>
+                    <MudText Typo="Typo.body1">@_order.CreatedAt.ToString("yyyy/MM/dd HH:mm")</MudText>
+                </MudStack>
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.body1">ステータス</MudText>
+                    <OrderStatusBadge Status="@_order.Status" />
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+
+        @* Order Items *@
+        <MudPaper Elevation="2" Class="pa-4 mb-4" Style="border-radius: 12px;">
+            <MudText Typo="Typo.h6" Class="mb-3">注文商品</MudText>
+            <MudSimpleTable Hover="true" Dense="true" Elevation="0">
+                <thead>
+                    <tr>
+                        <th>商品名</th>
+                        <th style="text-align: right;">数量</th>
+                        <th style="text-align: right;">金額</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in _order.Items)
+                    {
+                        <tr>
+                            <td>@item.ProductName</td>
+                            <td style="text-align: right;">@item.Quantity</td>
+                            <td style="text-align: right;">¥@item.Subtotal.ToString("N0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+
+            <MudDivider Class="my-3" />
+            <MudStack Row="true" Justify="Justify.SpaceBetween">
+                <MudText Typo="Typo.subtitle1" Style="font-weight: 700;">合計</MudText>
+                <MudText Typo="Typo.subtitle1" Style="font-weight: 700; color: #d32f2f;">
+                    ¥@_order.Total.ToString("N0")
+                </MudText>
+            </MudStack>
+        </MudPaper>
+
+        @* Tracking Info *@
+        @if (_shipment is not null)
+        {
+            <MudPaper Elevation="2" Class="pa-4" Style="border-radius: 12px;">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Class="mr-2" />配送情報
+                </MudText>
+
+                @if (_shipment.TrackingNumber is not null)
+                {
+                    <MudStack Row="true" Spacing="2" Class="mb-3" AlignItems="AlignItems.Center">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            追跡番号: @_shipment.TrackingNumber
+                        </MudText>
+                        @if (!string.IsNullOrEmpty(_shipment.CarrierTrackingUrl))
+                        {
+                            <MudLink Href="@_shipment.CarrierTrackingUrl"
+                                     Target="_blank"
+                                     rel="noopener noreferrer"
+                                     Color="Color.Primary">
+                                追跡サイトで確認
+                                <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" />
+                            </MudLink>
+                        }
+                    </MudStack>
+                }
+
+                @if (_shipment.EstimatedDeliveryDate.HasValue)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        お届け予定日: @_shipment.EstimatedDeliveryDate.Value.ToString("yyyy/MM/dd")
+                    </MudText>
+                }
+
+                @if (_shipment.Events.Count > 0)
+                {
+                    <MudTimeline TimelinePosition="TimelinePosition.Start">
+                        @foreach (var evt in _shipment.Events.OrderByDescending(e => e.OccurredAt))
+                        {
+                            <MudTimelineItem Color="Color.Primary" Size="Size.Small">
+                                <MudText Typo="Typo.body2" Style="font-weight: 600;">@evt.Description</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @evt.OccurredAt.ToString("yyyy/MM/dd HH:mm")
+                                </MudText>
+                            </MudTimelineItem>
+                        }
+                    </MudTimeline>
+                }
+            </MudPaper>
+        }
+    }
+</MudContainer>
+
+@code {
+    private string? _orderNumber;
+    private string? _email;
+    private bool _isSearching;
+    private bool _searchPerformed;
+    private string? _validationError;
+    private OrderDto? _order;
+    private ShipmentDto? _shipment;
+
+    private async Task SearchOrderAsync()
+    {
+        _validationError = null;
+        _order = null;
+        _shipment = null;
+
+        if (string.IsNullOrWhiteSpace(_orderNumber))
+        {
+            _validationError = "注文番号を入力してください";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_email))
+        {
+            _validationError = "メールアドレスを入力してください";
+            return;
+        }
+
+        _isSearching = true;
+        _searchPerformed = false;
+        StateHasChanged();
+
+        try
+        {
+            _order = await ShipmentReturnApi.GetOrderByNumberAndEmailAsync(
+                _orderNumber.Trim(), _email.Trim());
+
+            if (_order is not null)
+            {
+                _shipment = await ShipmentReturnApi.GetShipmentByOrderAsync(_order.Id);
+            }
+
+            _searchPerformed = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "注文追跡検索に失敗しました");
+            _searchPerformed = true;
+        }
+        finally
+        {
+            _isSearching = false;
+            StateHasChanged();
+        }
+    }
+}

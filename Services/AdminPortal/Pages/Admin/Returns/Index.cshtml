@@ -1,0 +1,130 @@
+@page
+@model AdminPortal.Pages.Admin.Returns.IndexModel
+@{
+    ViewData["Title"] = "返品管理";
+    Layout = "/Pages/Admin/_Layout.cshtml";
+}
+
+<h2 class="mb-4">返品管理</h2>
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+}
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="alert alert-success" role="alert">@Model.SuccessMessage</div>
+}
+
+<form method="get" class="row g-2 mb-4 align-items-end">
+    <div class="col-md-2">
+        <label class="form-label">ステータス</label>
+        <select class="form-select" name="status">
+            <option value="">すべて</option>
+            <option value="Requested" selected="@(Model.StatusFilter == "Requested")">申請中</option>
+            <option value="Approved" selected="@(Model.StatusFilter == "Approved")">承認済</option>
+            <option value="Rejected" selected="@(Model.StatusFilter == "Rejected")">却下</option>
+            <option value="Refunded" selected="@(Model.StatusFilter == "Refunded")">返金済</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-outline-primary"><i class="bi bi-funnel me-1"></i>フィルター</button>
+    </div>
+</form>
+
+<div class="table-responsive">
+    <table class="table table-dark table-striped table-hover">
+        <thead>
+            <tr>
+                <th>返品ID</th>
+                <th>注文ID</th>
+                <th>顧客名</th>
+                <th>理由</th>
+                <th>ステータス</th>
+                <th class="text-end">返金額</th>
+                <th>申請日</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Returns.Count == 0)
+            {
+                <tr><td colspan="8" class="text-center text-secondary py-4">返品データがありません</td></tr>
+            }
+            @foreach (var returnItem in Model.Returns)
+            {
+                <tr>
+                    <td><code>@returnItem.Id[..Math.Min(8, returnItem.Id.Length)]</code></td>
+                    <td><code>@returnItem.OrderId[..Math.Min(8, returnItem.OrderId.Length)]</code></td>
+                    <td>@returnItem.CustomerName</td>
+                    <td>@returnItem.Reason</td>
+                    <td>
+                        @{
+                            var badgeClass = returnItem.Status switch
+                            {
+                                "Requested" => "bg-warning text-dark",
+                                "Approved" => "bg-success",
+                                "Rejected" => "bg-danger",
+                                "Refunded" => "bg-info",
+                                _ => "bg-secondary"
+                            };
+                        }
+                        <span class="badge @badgeClass">@returnItem.Status</span>
+                    </td>
+                    <td class="text-end">¥@returnItem.RefundAmount.ToString("N0")</td>
+                    <td>@returnItem.RequestedAt.ToString("yyyy/MM/dd")</td>
+                    <td>
+                        @if (returnItem.Status == "Requested")
+                        {
+                            <div class="d-flex gap-1">
+                                <form method="post" asp-page-handler="Approve" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="returnId" value="@returnItem.Id" />
+                                    <button type="submit" class="btn btn-sm btn-outline-success"
+                                            title="承認">
+                                        <i class="bi bi-check-lg"></i>
+                                    </button>
+                                </form>
+                                <form method="post" asp-page-handler="Reject" class="d-inline"
+                                      onsubmit="return confirm('この返品リクエストを却下しますか？');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="returnId" value="@returnItem.Id" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"
+                                            title="却下">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        }
+                        else if (returnItem.Status == "Approved")
+                        {
+                            <a href="/Admin/Orders/Detail?id=@returnItem.OrderId" class="btn btn-sm btn-outline-info">
+                                返金処理
+                            </a>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (Model.TotalPages > 1)
+{
+    <nav aria-label="返品ページネーション">
+        <ul class="pagination justify-content-center">
+            <li class="page-item @(Model.CurrentPage <= 1 ? "disabled" : "")">
+                <a class="page-link" href="/Admin/Returns?page=@(Model.CurrentPage - 1)&status=@Model.StatusFilter">&laquo;</a>
+            </li>
+            @for (var i = 1; i <= Model.TotalPages; i++)
+            {
+                <li class="page-item @(i == Model.CurrentPage ? "active" : "")">
+                    <a class="page-link" href="/Admin/Returns?page=@i&status=@Model.StatusFilter">@i</a>
+                </li>
+            }
+            <li class="page-item @(Model.CurrentPage >= Model.TotalPages ? "disabled" : "")">
+                <a class="page-link" href="/Admin/Returns?page=@(Model.CurrentPage + 1)&status=@Model.StatusFilter">&raquo;</a>
+            </li>
+        </ul>
+    </nav>
+}

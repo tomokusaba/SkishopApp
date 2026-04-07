@@ -1,0 +1,59 @@
+@page
+@model AdminPortal.Pages.Admin.AiSupportModel
+@{
+    ViewData["Title"] = "AI サポート";
+    Layout = "_Layout";
+}
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="bi bi-robot"></i> AI サポート</h1>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card h-100 border-primary">
+                <div class="card-body text-center">
+                    <i class="bi bi-pie-chart text-primary" style="font-size: 3rem;"></i>
+                    <h5 class="card-title mt-3">AI 分析ダッシュボード</h5>
+                    <p class="card-text text-muted">
+                        検索分析・レコメンド分析・チャット分析のデータを確認できます。
+                    </p>
+                    <a href="/Admin/Ai/Analytics" class="btn btn-primary">
+                        <i class="bi bi-arrow-right-circle me-1"></i>分析を見る
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100 border-success">
+                <div class="card-body text-center">
+                    <i class="bi bi-graph-up-arrow text-success" style="font-size: 3rem;"></i>
+                    <h5 class="card-title mt-3">AI 需要予測</h5>
+                    <p class="card-text text-muted">
+                        商品カテゴリ別の需要予測を確認し、新しい予測を生成できます。
+                    </p>
+                    <a href="/Admin/Ai/Forecast" class="btn btn-success">
+                        <i class="bi bi-arrow-right-circle me-1"></i>予測を見る
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100 border-warning">
+                <div class="card-body text-center">
+                    <i class="bi bi-cpu text-warning" style="font-size: 3rem;"></i>
+                    <h5 class="card-title mt-3">AI モデル管理</h5>
+                    <p class="card-text text-muted">
+                        AI モデルのステータス確認、トレーニング実行、モデルの管理を行います。
+                    </p>
+                    <a href="/Admin/Ai/Models" class="btn btn-warning">
+                        <i class="bi bi-arrow-right-circle me-1"></i>モデルを管理
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,254 @@
+@page
+@model AdminPortal.Pages.Admin.Reports.IndexModel
+@{
+    ViewData["Title"] = "レポート";
+    Layout = "/Pages/Admin/_Layout.cshtml";
+}
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="bi bi-bar-chart-line"></i> レポート</h1>
+    </div>
+
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link @(Model.ActiveTab == "sales" ? "active" : "")"
+               asp-page="/Admin/Reports/Index" asp-route-activeTab="sales"
+               asp-route-startDate="@Model.StartDate?.ToString("yyyy-MM-dd")"
+               asp-route-endDate="@Model.EndDate?.ToString("yyyy-MM-dd")">売上レポート</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(Model.ActiveTab == "inventory" ? "active" : "")"
+               asp-page="/Admin/Reports/Index" asp-route-activeTab="inventory">在庫レポート</a>
+        </li>
+    </ul>
+
+    @if (Model.ActiveTab == "sales")
+    {
+        <div class="card mb-3">
+            <div class="card-body">
+                <form method="get" class="row g-3 align-items-end">
+                    <input type="hidden" name="ActiveTab" value="sales" />
+                    <div class="col-md-3">
+                        <label class="form-label">開始日</label>
+                        <input type="date" class="form-control" name="StartDate"
+                               value="@Model.StartDate?.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">終了日</label>
+                        <input type="date" class="form-control" name="EndDate"
+                               value="@Model.EndDate?.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">集計期間</label>
+                        <select name="Period" class="form-select">
+                            <option value="daily" selected="@(Model.Period == "daily")">日次</option>
+                            <option value="weekly" selected="@(Model.Period == "weekly")">週次</option>
+                            <option value="monthly" selected="@(Model.Period == "monthly")">月次</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-primary w-100">表示</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        @if (Model.SalesReport is not null)
+        {
+            <div class="row g-4 mb-4">
+                <div class="col-md-4">
+                    <div class="card text-white bg-primary">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">総売上</h6>
+                            <h2>¥@Model.SalesReport.TotalRevenue.ToString("N0")</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-white bg-success">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">注文数</h6>
+                            <h2>@Model.SalesReport.TotalOrders</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-white bg-info">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">平均注文額</h6>
+                            <h2>¥@Model.SalesReport.AverageOrderValue.ToString("N0")</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">売上サマリー</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>期間</th>
+                                    <th>売上</th>
+                                    <th>注文数</th>
+                                    <th>平均注文額</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.SalesReport.Summary.Count == 0)
+                                {
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-4">データがありません。</td>
+                                    </tr>
+                                }
+                                @foreach (var item in Model.SalesReport.Summary)
+                                {
+                                    <tr>
+                                        <td>@item.PeriodLabel</td>
+                                        <td>¥@item.Revenue.ToString("N0")</td>
+                                        <td>@item.OrderCount</td>
+                                        <td>¥@item.AverageValue.ToString("N0")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-warning">売上レポートの取得に失敗しました。</div>
+        }
+    }
+    else if (Model.ActiveTab == "inventory")
+    {
+        @if (Model.InventoryReport is not null)
+        {
+            <div class="row g-4 mb-4">
+                <div class="col-md-4">
+                    <div class="card text-white bg-primary">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">商品数</h6>
+                            <h2>@Model.InventoryReport.TotalProducts</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-white bg-warning">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">在庫少</h6>
+                            <h2>@Model.InventoryReport.LowStockCount</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-white bg-danger">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">在庫切れ</h6>
+                            <h2>@Model.InventoryReport.OutOfStockCount</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @if (Model.InventoryReport.LowStockAlerts.Count > 0)
+            {
+                <div class="card mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> 在庫アラート</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>商品名</th>
+                                        <th>現在在庫</th>
+                                        <th>発注基準</th>
+                                        <th>重要度</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var alert in Model.InventoryReport.LowStockAlerts)
+                                    {
+                                        <tr>
+                                            <td>@alert.ProductName</td>
+                                            <td>@alert.CurrentStock</td>
+                                            <td>@alert.ReorderLevel</td>
+                                            <td>
+                                                <span class="badge bg-@(alert.Severity == "critical" ? "danger" : "warning")">
+                                                    @(alert.Severity == "critical" ? "緊急" : "注意")
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">在庫レベル一覧</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>商品名</th>
+                                    <th>カテゴリ</th>
+                                    <th>現在在庫</th>
+                                    <th>発注基準</th>
+                                    <th>ステータス</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.InventoryReport.StockLevels.Count == 0)
+                                {
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-4">データがありません。</td>
+                                    </tr>
+                                }
+                                @foreach (var item in Model.InventoryReport.StockLevels)
+                                {
+                                    <tr>
+                                        <td>@item.ProductName</td>
+                                        <td>@item.Category</td>
+                                        <td>@item.CurrentStock</td>
+                                        <td>@item.ReorderLevel</td>
+                                        <td>
+                                            @if (item.CurrentStock <= 0)
+                                            {
+                                                <span class="badge bg-danger">在庫切れ</span>
+                                            }
+                                            else if (item.CurrentStock <= item.ReorderLevel)
+                                            {
+                                                <span class="badge bg-warning">在庫少</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-success">正常</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-warning">在庫レポートの取得に失敗しました。</div>
+        }
+    }
+</div>

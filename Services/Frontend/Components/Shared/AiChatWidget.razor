@@ -1,0 +1,390 @@
+@namespace Frontend.Components.Shared
+@using Microsoft.AspNetCore.SignalR.Client
+@using Markdig
+@using Microsoft.JSInterop
+@rendermode @(RenderMode.InteractiveServer)
+@implements IAsyncDisposable
+
+@inject NavigationManager Navigation
+@inject IAiApiClient AiApi
+@inject IHtmlSanitizationService Sanitizer
+@inject ILogger<AiChatWidget> Logger
+@inject IJSRuntime JS
+
+@* §15.12 準拠 — AI チャットウィジェット（SignalR ストリーミング） *@
+
+@if (!_isOpen)
+{
+    <MudFab Color="Color.Primary"
+            StartIcon="@Icons.Material.Filled.Chat"
+            Style="position: fixed; bottom: 24px; right: 24px; z-index: 1000;"
+            aria-label="AI チャットを開く"
+            OnClick="OpenChat" />
+}
+else
+{
+    <MudPaper Elevation="8"
+              Style="position: fixed; bottom: 24px; right: 24px; width: 380px; height: 520px; z-index: 1000; display: flex; flex-direction: column; border-radius: 16px; overflow: hidden;">
+        @* ヘッダー *@
+        <MudToolBar Dense="true" Class="px-3" Style="background-color: #1565C0; color: white;">
+            <MudIcon Icon="@Icons.Material.Filled.SmartToy" Class="mr-2" />
+            <MudText Typo="Typo.subtitle1" Style="color: white;">AI アシスタント</MudText>
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Filled.Close"
+                           Color="Color.Inherit"
+                           Size="Size.Small"
+                           aria-label="チャットを閉じる"
+                           OnClick="CloseChat" />
+        </MudToolBar>
+
+        @* メッセージ一覧 *@
+        <div @ref="_messageContainer"
+             style="flex: 1; overflow-y: auto; padding: 12px; background-color: #F5F7FA;"
+             role="log"
+             aria-label="チャットメッセージ"
+             aria-live="polite">
+            @foreach (var message in _messages)
+            {
+                <div style="display: flex; justify-content: @(message.IsUser ? "flex-end" : "flex-start"); margin-bottom: 8px;">
+                    <MudPaper Elevation="1"
+                              Class="pa-2"
+                              Style="@GetMessageStyle(message.IsUser)">
+                        @if (message.IsUser)
+                        {
+                            <MudText Typo="Typo.body2">@message.Content</MudText>
+                        }
+                        else
+                        {
+                            <div class="ai-chat-markdown" style="font-size: 0.875rem; line-height: 1.5;">
+                                @RenderMarkdown(message.Content)
+                            </div>
+                        }
+                    </MudPaper>
+                </div>
+            }
+
+            @if (_isWaitingForResponse)
+            {
+                <div style="display: flex; justify-content: flex-start; margin-bottom: 8px;">
+                    <MudPaper Elevation="1" Class="pa-3" Style="max-width: 85%; border-radius: 12px; background-color: white;">
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <span class="typing-dot" style="animation-delay: 0s;"></span>
+                            <span class="typing-dot" style="animation-delay: 0.2s;"></span>
+                            <span class="typing-dot" style="animation-delay: 0.4s;"></span>
+                            <MudText Typo="Typo.caption" Class="ml-2" Style="color: #757575;">AI が考えています...</MudText>
+                        </div>
+                    </MudPaper>
+                </div>
+            }
+        </div>
+
+        @* エスカレーション完了メッセージ *@
+        @if (_isEscalated)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mx-2 mb-1" Variant="Variant.Filled">
+                担当者に引き継ぎました。メールにてご連絡いたします。
+            </MudAlert>
+        }
+
+        @* 入力エリア *@
+        <MudPaper Elevation="0" Class="pa-2" Style="border-top: 1px solid #E0E0E0;">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                <input @ref="_chatInputElement"
+                       @bind="_inputMessage"
+                       @bind:event="oninput"
+                       placeholder="メッセージを入力..."
+                       disabled="@(_isEscalated || _isSending)"
+                       aria-label="チャットメッセージ入力"
+                       style="flex: 1; padding: 8px 12px; border: 1px solid #BDBDBD; border-radius: 4px; font-size: 0.875rem; outline: none; background: white;" />
+                <MudIconButton Icon="@Icons.Material.Filled.Send"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               Disabled="@(string.IsNullOrWhiteSpace(_inputMessage) || _isEscalated || _isSending)"
+                               aria-label="送信"
+                               OnClick="SendMessage" />
+            </MudStack>
+            @if (!_isEscalated)
+            {
+                <MudButton Variant="Variant.Text"
+                           Size="Size.Small"
+                           Color="Color.Secondary"
+                           StartIcon="@Icons.Material.Filled.SupportAgent"
+                           FullWidth="true"
+                           Class="mt-1"
+                           OnClick="RequestEscalation">
+                    オペレーターに問い合わせ
+                </MudButton>
+            }
+        </MudPaper>
+    </MudPaper>
+}
+
+@code {
+    private static readonly MarkdownPipeline _markdownPipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .Build();
+
+    private HubConnection? _hubConnection;
+    private ElementReference _messageContainer;
+    private ElementReference _chatInputElement;
+    private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<AiChatWidget>? _dotNetRef;
+    private readonly List<ChatMessage> _messages = [];
+    private string _inputMessage = string.Empty;
+    private string? _sessionId;
+    private bool _isOpen;
+    private bool _isStreaming;
+    private bool _isSending;
+    private bool _isEscalated;
+    private bool _isWaitingForResponse;
+    private bool _jsInitialized;
+    private string _currentAiResponse = string.Empty;
+
+    @inject IDialogService DialogService
+
+    private async Task OpenChat()
+    {
+        _isOpen = true;
+
+        if (_hubConnection is null)
+        {
+            await InitializeSignalRAsync();
+        }
+
+        if (_sessionId is null)
+        {
+            var session = await AiApi.CreateChatSessionAsync();
+            _sessionId = session?.Id;
+            if (_sessionId is not null)
+            {
+                _messages.Add(new ChatMessage(false, "こんにちは！スキー用品に関するご質問はありますか？"));
+            }
+            else
+            {
+                _messages.Add(new ChatMessage(false, "申し訳ございません。チャットサービスに接続できませんでした。"));
+            }
+        }
+
+        // JS モジュールを初期化（DOM レンダリング後に実行）
+        if (!_jsInitialized)
+        {
+            await Task.Yield();
+            await InvokeAsync(StateHasChanged);
+            await InitializeJsAsync();
+        }
+    }
+
+    private void CloseChat()
+    {
+        _isOpen = false;
+    }
+
+    private async Task InitializeSignalRAsync()
+    {
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/ai-chat"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.Reconnecting += (ex) =>
+        {
+            Logger.LogWarning(ex, "AI チャット SignalR 再接続中");
+            return Task.CompletedTask;
+        };
+
+        _hubConnection.Closed += (ex) =>
+        {
+            Logger.LogWarning(ex, "AI チャット SignalR 接続断");
+            return Task.CompletedTask;
+        };
+
+        _hubConnection.On<string>("ReceiveToken", async (token) =>
+        {
+            _isWaitingForResponse = false;
+            _currentAiResponse += token;
+            UpdateStreamingMessage();
+            await InvokeAsync(StateHasChanged);
+            await ScrollToBottomAsync();
+        });
+
+        _hubConnection.On<string>("MessageComplete", async (messageId) =>
+        {
+            _isStreaming = false;
+            _isWaitingForResponse = false;
+            Logger.LogInformation("AI メッセージ完了: MessageId={MessageId}", messageId);
+            await InvokeAsync(StateHasChanged);
+        });
+
+        try
+        {
+            await _hubConnection.StartAsync(CancellationToken.None);
+            Logger.LogInformation("AI チャット SignalR 接続確立");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "AI チャット SignalR 接続失敗");
+        }
+    }
+
+    private void UpdateStreamingMessage()
+    {
+        if (_messages.Count > 0 && !_messages[^1].IsUser && _isStreaming)
+        {
+            _messages[^1] = _messages[^1] with { Content = _currentAiResponse };
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_inputMessage) || _sessionId is null || _hubConnection is null)
+        {
+            return;
+        }
+
+        var userMessage = _inputMessage.Trim();
+        _inputMessage = string.Empty;
+        _isSending = true;
+
+        _messages.Add(new ChatMessage(true, userMessage));
+
+        _currentAiResponse = string.Empty;
+        _isStreaming = true;
+        _isWaitingForResponse = true;
+        _messages.Add(new ChatMessage(false, string.Empty));
+
+        // 思考中インジケーターを即座に描画するため明示的にレンダリング
+        StateHasChanged();
+        await ScrollToBottomAsync();
+
+        try
+        {
+            // SendAsync は fire-and-forget（Hub メソッド完了を待たない）
+            // レスポンスは ReceiveToken / MessageComplete コールバック経由で受信
+            await _hubConnection.SendAsync("SendMessage", _sessionId, userMessage, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "AI チャットメッセージ送信失敗");
+            _isStreaming = false;
+            _isWaitingForResponse = false;
+            _messages[^1] = _messages[^1] with { Content = "申し訳ございません。メッセージの送信に失敗しました。" };
+        }
+        finally
+        {
+            _isSending = false;
+        }
+    }
+
+    /// <summary>
+    /// JS から呼び出される Enter キーハンドラー（IME 変換中でないことは JS 側で確認済み）
+    /// </summary>
+    [JSInvokable]
+    public async Task HandleEnterKey()
+    {
+        await SendMessage();
+    }
+
+    private async Task InitializeJsAsync()
+    {
+        try
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import", "/js/ai-chat-input.js");
+            await _jsModule.InvokeVoidAsync("initChatInput", _chatInputElement, _dotNetRef);
+            _jsInitialized = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "AI チャット JS モジュール初期化失敗");
+        }
+    }
+
+    private MarkupString RenderMarkdown(string markdown)
+    {
+        if (string.IsNullOrWhiteSpace(markdown))
+        {
+            return new MarkupString(string.Empty);
+        }
+
+        var html = Markdown.ToHtml(markdown, _markdownPipeline);
+        return Sanitizer.Sanitize(html);
+    }
+
+    private async Task RequestEscalation()
+    {
+        var confirmed = await ShowEscalationConfirmDialogAsync();
+        if (!confirmed || _sessionId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await AiApi.EscalateChatAsync(_sessionId);
+            _isEscalated = true;
+            Logger.LogInformation("AI チャットエスカレーション完了: SessionId={SessionId}", _sessionId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "AI チャットエスカレーション失敗: SessionId={SessionId}", _sessionId);
+            _messages.Add(new ChatMessage(false, "エスカレーション処理に失敗しました。しばらくしてからお試しください。"));
+        }
+    }
+
+    private async Task<bool> ShowEscalationConfirmDialogAsync()
+    {
+        var parameters = new DialogParameters<MudMessageBox>
+        {
+            { x => x.Title, "オペレーターへの引き継ぎ" },
+            { x => x.MarkupMessage, new MarkupString("チャット内容を担当者に引き継ぎます。よろしいですか？") },
+            { x => x.YesText, "引き継ぐ" },
+            { x => x.NoText, "キャンセル" }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dialogRef = await DialogService.ShowAsync<MudMessageBox>("確認", parameters, options);
+        var result = await dialogRef.GetReturnValueAsync<string?>();
+        return result is not null;
+    }
+
+    private async Task ScrollToBottomAsync()
+    {
+        await Task.Yield();
+    }
+
+    private static string GetMessageStyle(bool isUser) => isUser
+        ? "max-width: 85%; border-radius: 12px; background-color: #1565C0; color: white;"
+        : "max-width: 85%; border-radius: 12px; background-color: white;";
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+        {
+            try
+            {
+                await _hubConnection.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "AI チャット SignalR 切断時エラー");
+            }
+        }
+
+        if (_jsModule is not null)
+        {
+            try
+            {
+                await _jsModule.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // Blazor Server 切断時は無視
+            }
+        }
+
+        _dotNetRef?.Dispose();
+    }
+
+    private record ChatMessage(bool IsUser, string Content);
+}

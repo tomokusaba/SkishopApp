@@ -1,0 +1,169 @@
+@page "/mypage/delete-account"
+@rendermode @(RenderMode.InteractiveServer)
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject Frontend.Services.Interfaces.IApiGatewayClient ApiClient
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+@inject ILogger<Frontend.Components.Pages.MyPage.DeleteAccount> Logger
+
+<PageTitle>アカウント削除 — Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack"
+               Href="/mypage" Class="mb-4">
+        マイページに戻る
+    </MudButton>
+
+    <MudPaper Elevation="4" Class="pa-8 rounded-lg">
+        <div class="text-center mb-6">
+            <MudIcon Icon="@Icons.Material.Filled.DeleteForever" Color="Color.Error" Size="Size.Large" />
+            <MudText Typo="Typo.h4" Class="mt-2" Style="font-weight: 700; color: #C62828;">
+                アカウント削除
+            </MudText>
+        </div>
+
+        <MudAlert Severity="Severity.Error" Class="mb-6" role="alert">
+            <strong>この操作は取り消せません。</strong>
+            アカウントを削除すると、以下のデータがすべて永久に失われます。
+        </MudAlert>
+
+        <MudPaper Elevation="0" Class="pa-4 mb-6" Style="background: #FFEBEE; border-radius: 8px;">
+            <MudText Typo="Typo.subtitle2" Class="mb-2" Style="font-weight: 600; color: #C62828;">
+                削除されるデータ:
+            </MudText>
+            <MudList T="string" Dense="true">
+                <MudListItem Icon="@Icons.Material.Filled.Person" IconColor="Color.Error">
+                    プロフィール情報
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.ShoppingBag" IconColor="Color.Error">
+                    注文履歴
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Star" IconColor="Color.Error">
+                    ポイント残高・履歴
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Favorite" IconColor="Color.Error">
+                    ウィッシュリスト
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.LocationOn" IconColor="Color.Error">
+                    登録済み住所
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.RateReview" IconColor="Color.Error">
+                    レビュー・評価
+                </MudListItem>
+            </MudList>
+        </MudPaper>
+
+        <MudTextField @bind-Value="_password"
+                      Label="パスワードを入力（本人確認）"
+                      InputType="InputType.Password"
+                      Required="true"
+                      Variant="Variant.Outlined"
+                      Class="mb-4"
+                      autocomplete="current-password" />
+
+        <MudSelect @bind-Value="_reason"
+                   Label="削除理由（任意）"
+                   Variant="Variant.Outlined"
+                   Class="mb-4">
+            <MudSelectItem Value="@string.Empty">選択してください</MudSelectItem>
+            <MudSelectItem Value="@("サービスに不満")">サービスに不満</MudSelectItem>
+            <MudSelectItem Value="@("他のサービスを利用")">他のサービスを利用</MudSelectItem>
+            <MudSelectItem Value="@("個人情報の懸念")">個人情報の懸念</MudSelectItem>
+            <MudSelectItem Value="@("利用頻度が低い")">利用頻度が低い</MudSelectItem>
+            <MudSelectItem Value="@("その他")">その他</MudSelectItem>
+        </MudSelect>
+
+        <MudCheckBox @bind-Value="_isConfirmed"
+                     Label="上記を理解した上でアカウントを削除します"
+                     Color="Color.Error"
+                     Class="mb-4" />
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4" role="alert">@_errorMessage</MudAlert>
+        }
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Error"
+                   FullWidth="true"
+                   Size="Size.Large"
+                   OnClick="HandleDeleteAccountAsync"
+                   Disabled="@(!CanSubmit)"
+                   Style="min-height: 48px;">
+            @if (_isDeleting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            アカウントを削除する
+        </MudButton>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private string _password = string.Empty;
+    private string _reason = string.Empty;
+    private bool _isConfirmed;
+    private bool _isDeleting;
+    private string? _errorMessage;
+    private string? _userId;
+
+    private bool CanSubmit => _isConfirmed
+        && !string.IsNullOrWhiteSpace(_password)
+        && !_isDeleting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var profile = await ApiClient.GetAsync<UserProfileDto>("/api/v1/users/me");
+            _userId = profile?.Id;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "ユーザー情報の取得に失敗: {Message}", ex.Message);
+        }
+    }
+
+    private async Task HandleDeleteAccountAsync()
+    {
+        if (!CanSubmit || _userId is null) return;
+
+        var confirmed = await DialogService.ShowMessageBox(
+            "最終確認",
+            "本当にアカウントを削除しますか？この操作は元に戻せません。",
+            yesText: "削除する", cancelText: "キャンセル");
+
+        if (confirmed != true) return;
+
+        _isDeleting = true;
+        _errorMessage = null;
+
+        try
+        {
+            var request = new RequestDeletionRequest(_password, string.IsNullOrEmpty(_reason) ? null : _reason);
+            await ApiClient.PostAsync<RequestDeletionRequest, DeletionRequestDto>(
+                $"/api/v1/users/{_userId}/deletion-request", request);
+
+            Snackbar.Add("アカウント削除リクエストを受け付けました", Severity.Info);
+            Navigation.NavigateTo("/auth/login", forceLoad: true);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _errorMessage = "パスワードが正しくありません";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "アカウント削除リクエストに失敗: {Message}", ex.Message);
+            _errorMessage = "アカウント削除に失敗しました。しばらく経ってからお試しください。";
+        }
+        finally
+        {
+            _isDeleting = false;
+        }
+    }
+
+    private record UserProfileDto(string Id, string Email, string Name, string? PhoneNumber, string Role, DateTime CreatedAt);
+    private record RequestDeletionRequest(string Password, string? Reason);
+    private record DeletionRequestDto(string RequestId, string Status, DateTime RequestedAt, string? Reason);
+}

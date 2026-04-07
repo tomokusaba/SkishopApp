@@ -1,0 +1,208 @@
+@page
+@model AdminPortal.Pages.Admin.Points.IndexModel
+@{
+    ViewData["Title"] = "ポイント管理";
+    Layout = "/Pages/Admin/_Layout.cshtml";
+}
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="bi bi-star"></i> ポイント管理</h1>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            @Model.StatusMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link @(Model.ActiveTab == "overview" ? "active" : "")"
+               asp-page="/Admin/Points/Index" asp-route-activeTab="overview">概要</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(Model.ActiveTab == "adjust" ? "active" : "")"
+               asp-page="/Admin/Points/Index" asp-route-activeTab="adjust">ポイント調整</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(Model.ActiveTab == "analytics" ? "active" : "")"
+               asp-page="/Admin/Points/Index" asp-route-activeTab="analytics">分析</a>
+        </li>
+    </ul>
+
+    @if (Model.ActiveTab == "overview")
+    {
+        @if (Model.Overview is not null)
+        {
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="card text-white bg-primary">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">発行済みポイント</h6>
+                            <h2>@Model.Overview.TotalIssued.ToString("N0")</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-success">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">消費済みポイント</h6>
+                            <h2>@Model.Overview.TotalConsumed.ToString("N0")</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-warning">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">失効ポイント</h6>
+                            <h2>@Model.Overview.TotalExpired.ToString("N0")</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-info">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">現在残高合計</h6>
+                            <h2>@Model.Overview.CurrentBalance.ToString("N0")</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5>アクティブユーザー数: <strong>@Model.Overview.ActiveUsers</strong></h5>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-warning">ポイント概要データの取得に失敗しました。</div>
+        }
+    }
+    else if (Model.ActiveTab == "adjust")
+    {
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">ポイント調整</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" asp-page-handler="Adjust">
+                    @Html.AntiForgeryToken()
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">ユーザー検索</label>
+                            <input type="text" class="form-control" asp-for="Adjustment.UserSearchTerm"
+                                   placeholder="ユーザー名またはメールアドレス" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">ユーザーID</label>
+                            <input type="text" class="form-control" asp-for="Adjustment.UserId"
+                                   required placeholder="対象ユーザーのID" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">調整ポイント数</label>
+                            <input type="number" class="form-control" asp-for="Adjustment.Amount" required
+                                   placeholder="正の値＝付与、負の値＝減算" />
+                            <div class="form-text">正の値でポイント付与、負の値でポイント減算</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">理由</label>
+                            <input type="text" class="form-control" asp-for="Adjustment.Reason"
+                                   required maxlength="200" placeholder="調整理由を入力" />
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary"
+                                    onclick="return confirm('ポイントを調整しますか？')">
+                                <i class="bi bi-check-circle"></i> 調整を実行
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+    else if (Model.ActiveTab == "analytics")
+    {
+        @if (Model.Analytics is not null)
+        {
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">月別 KPI</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>月</th>
+                                    <th>発行</th>
+                                    <th>消費</th>
+                                    <th>失効</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var kpi in Model.Analytics.MonthlyKpis)
+                                {
+                                    <tr>
+                                        <td>@kpi.Month</td>
+                                        <td>@kpi.Issued.ToString("N0")</td>
+                                        <td>@kpi.Consumed.ToString("N0")</td>
+                                        <td>@kpi.Expired.ToString("N0")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">推移チャート</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-graph-up" style="font-size: 3rem;"></i>
+                        <p class="mt-2">チャートは将来のバージョンで実装予定です。</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">ティア別分布</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ティア</th>
+                                    <th>ユーザー数</th>
+                                    <th>割合</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var tier in Model.Analytics.TierDistributions)
+                                {
+                                    <tr>
+                                        <td>@tier.Tier</td>
+                                        <td>@tier.UserCount</td>
+                                        <td>@tier.Percentage.ToString("P1")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-warning">ポイント分析データの取得に失敗しました。</div>
+        }
+    }
+</div>

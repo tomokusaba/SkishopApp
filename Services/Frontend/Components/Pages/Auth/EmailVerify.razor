@@ -1,0 +1,106 @@
+@page "/auth/email/verify"
+@rendermode @(RenderMode.InteractiveServer)
+@inject IAuthApiClient AuthApi
+@inject NavigationManager Navigation
+
+<PageTitle>メール認証 — Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
+    <MudPaper Elevation="4" Class="pa-8 rounded-lg text-center">
+        @if (_isLoading)
+        {
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+            <MudText Typo="Typo.h6" Class="mt-4">認証を確認中...</MudText>
+        }
+        else
+        {
+            switch (_status)
+            {
+                case "SUCCESS":
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success"
+                             Style="font-size: 64px;" />
+                    <MudText Typo="Typo.h5" Class="mt-4" Style="font-weight: 700; color: #2E7D32;" role="status">
+                        メールアドレスが認証されました ✓
+                    </MudText>
+                    <MudText Typo="Typo.body1" Class="mt-2 mb-6" Color="Color.Secondary">
+                        アカウントが有効化されました。ログインしてお買い物をお楽しみください。
+                    </MudText>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Size="Size.Large"
+                               Href="/auth/login"
+                               Style="min-height: 48px;">
+                        ログイン画面へ
+                    </MudButton>
+                    break;
+
+                case "EXPIRED":
+                    <MudIcon Icon="@Icons.Material.Filled.TimerOff" Color="Color.Warning"
+                             Style="font-size: 64px;" />
+                    <MudText Typo="Typo.h5" Class="mt-4" Style="font-weight: 700;" role="alert">
+                        認証リンクの有効期限が切れています
+                    </MudText>
+                    <MudText Typo="Typo.body1" Class="mt-2 mb-6" Color="Color.Secondary">
+                        もう一度認証メールを送信してください。
+                    </MudText>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               Size="Size.Large"
+                               Href="/auth/email/pending"
+                               Style="min-height: 44px;">
+                        認証メールを再送信する
+                    </MudButton>
+                    break;
+
+                default:
+                    <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error"
+                             Style="font-size: 64px;" />
+                    <MudText Typo="Typo.h5" Class="mt-4" Style="font-weight: 700;" role="alert">
+                        無効なリンクです
+                    </MudText>
+                    <MudText Typo="Typo.body1" Class="mt-2 mb-6" Color="Color.Secondary">
+                        このリンクは無効です。お手数ですがカスタマーサポートにお問い合わせください。
+                    </MudText>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               Href="/support"
+                               Style="min-height: 44px;">
+                        カスタマーサポートに問い合わせる
+                    </MudButton>
+                    break;
+            }
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string? Token { get; set; }
+
+    private bool _isLoading = true;
+    private string _status = "INVALID";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Token))
+        {
+            _status = "INVALID";
+            _isLoading = false;
+            return;
+        }
+
+        try
+        {
+            var result = await AuthApi.VerifyEmailAsync(Token);
+            _status = result.Status.ToUpperInvariant();
+        }
+        catch
+        {
+            _status = "INVALID";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

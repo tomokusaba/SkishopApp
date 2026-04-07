@@ -1,0 +1,136 @@
+@page
+@model AdminPortal.Pages.Admin.Ai.Forecast.IndexModel
+@{
+    ViewData["Title"] = "AI 需要予測";
+    Layout = "/Pages/Admin/_Layout.cshtml";
+}
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="bi bi-graph-up-arrow"></i> AI 需要予測</h1>
+        @if (!Model.IsStaffRole)
+        {
+            <form method="post" asp-page-handler="Generate">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-primary"
+                        onclick="return confirm('需要予測を生成しますか？処理に時間がかかる場合があります。')">
+                    <i class="bi bi-cpu"></i> 予測を生成
+                </button>
+            </form>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            @Model.StatusMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">商品</label>
+                    <input type="text" class="form-control" name="ProductFilter" value="@Model.ProductFilter"
+                           placeholder="商品名で検索" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">カテゴリ</label>
+                    <input type="text" class="form-control" name="CategoryFilter" value="@Model.CategoryFilter"
+                           placeholder="カテゴリ名" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">予測期間</label>
+                    <select name="PeriodFilter" class="form-select">
+                        <option value="weekly" selected="@(Model.PeriodFilter == "weekly")">週次</option>
+                        <option value="monthly" selected="@(Model.PeriodFilter == "monthly")">月次</option>
+                        <option value="quarterly" selected="@(Model.PeriodFilter == "quarterly")">四半期</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">フィルタ適用</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>商品名</th>
+                            <th>カテゴリ</th>
+                            <th>予測期間</th>
+                            <th>予測数量</th>
+                            <th>信頼度</th>
+                            <th>生成日時</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Forecasts.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">予測データがありません。</td>
+                            </tr>
+                        }
+                        @foreach (var forecast in Model.Forecasts)
+                        {
+                            <tr>
+                                <td>@forecast.ProductName</td>
+                                <td>@forecast.Category</td>
+                                <td>@forecast.Period</td>
+                                <td><strong>@forecast.ForecastQuantity</strong></td>
+                                <td>
+                                    @{
+                                        var confidenceClass = forecast.Confidence >= 0.8m ? "success"
+                                            : forecast.Confidence >= 0.6m ? "warning" : "danger";
+                                    }
+                                    <span class="badge bg-@confidenceClass">
+                                        @forecast.Confidence.ToString("P0")
+                                    </span>
+                                </td>
+                                <td>@forecast.GeneratedAt.ToString("yyyy/MM/dd HH:mm")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (Model.TotalPages > 1)
+            {
+                <nav aria-label="ページナビゲーション">
+                    <ul class="pagination justify-content-center">
+                        <li class="page-item @(Model.CurrentPage <= 1 ? "disabled" : "")">
+                            <a class="page-link" asp-page="/Admin/Ai/Forecast/Index"
+                               asp-route-currentPage="@(Model.CurrentPage - 1)"
+                               asp-route-productFilter="@Model.ProductFilter"
+                               asp-route-categoryFilter="@Model.CategoryFilter"
+                               asp-route-periodFilter="@Model.PeriodFilter">前へ</a>
+                        </li>
+                        @for (var i = 1; i <= Model.TotalPages; i++)
+                        {
+                            <li class="page-item @(i == Model.CurrentPage ? "active" : "")">
+                                <a class="page-link" asp-page="/Admin/Ai/Forecast/Index"
+                                   asp-route-currentPage="@i"
+                                   asp-route-productFilter="@Model.ProductFilter"
+                                   asp-route-categoryFilter="@Model.CategoryFilter"
+                                   asp-route-periodFilter="@Model.PeriodFilter">@i</a>
+                            </li>
+                        }
+                        <li class="page-item @(Model.CurrentPage >= Model.TotalPages ? "disabled" : "")">
+                            <a class="page-link" asp-page="/Admin/Ai/Forecast/Index"
+                               asp-route-currentPage="@(Model.CurrentPage + 1)"
+                               asp-route-productFilter="@Model.ProductFilter"
+                               asp-route-categoryFilter="@Model.CategoryFilter"
+                               asp-route-periodFilter="@Model.PeriodFilter">次へ</a>
+                        </li>
+                    </ul>
+                </nav>
+            }
+        </div>
+    </div>
+</div>

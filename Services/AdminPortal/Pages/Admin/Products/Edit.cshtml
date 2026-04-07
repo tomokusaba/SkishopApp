@@ -1,0 +1,137 @@
+@page
+@model AdminPortal.Pages.Admin.Products.EditModel
+@{
+    ViewData["Title"] = "商品編集";
+    Layout = "/Pages/Admin/_Layout.cshtml";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>商品編集</h2>
+    <a href="/Admin/Products" class="btn btn-outline-secondary">← 一覧に戻る</a>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+}
+
+<form method="post">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="Id" />
+
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#basic-tab" type="button" role="tab">基本情報</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#price-tab" type="button" role="tab">価格設定</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#history-tab" type="button" role="tab">価格履歴</button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="basic-tab" role="tabpanel">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">商品名 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="name" asp-for="Name" required maxlength="200" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">説明</label>
+                        <textarea class="form-control" id="description" asp-for="Description" rows="5" maxlength="2000"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="categoryId" class="form-label">カテゴリ</label>
+                            <select class="form-select" id="categoryId" asp-for="CategoryId">
+                                <option value="">-- 選択してください --</option>
+                                @foreach (var category in Model.Categories)
+                                {
+                                    <option value="@category.Id">@category.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="sku" class="form-label">SKU</label>
+                            <input type="text" class="form-control" id="sku" asp-for="Sku" maxlength="50" />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="imageUrl" class="form-label">画像URL</label>
+                        <input type="url" class="form-control" id="imageUrl" asp-for="ImageUrl" maxlength="500" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="price-tab" role="tabpanel">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="price" class="form-label">通常価格 <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text">¥</span>
+                            <input type="number" class="form-control" id="price" asp-for="Price" min="0" step="1" required />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="salePrice" class="form-label">セール価格</label>
+                        <div class="input-group">
+                            <span class="input-group-text">¥</span>
+                            <input type="number" class="form-control" id="salePrice" asp-for="SalePrice" min="0" step="1" />
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="saleStartDate" class="form-label">セール開始日</label>
+                            <input type="datetime-local" class="form-control" id="saleStartDate" asp-for="SaleStartDate" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="saleEndDate" class="form-label">セール終了日</label>
+                            <input type="datetime-local" class="form-control" id="saleEndDate" asp-for="SaleEndDate" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="history-tab" role="tabpanel">
+            <div class="table-responsive">
+                <table class="table table-dark table-striped">
+                    <thead>
+                        <tr>
+                            <th>変更日時</th>
+                            <th class="text-end">通常価格</th>
+                            <th class="text-end">セール価格</th>
+                            <th>変更者</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.PriceHistory.Count == 0)
+                        {
+                            <tr><td colspan="4" class="text-center text-secondary py-3">価格履歴がありません</td></tr>
+                        }
+                        @foreach (var history in Model.PriceHistory)
+                        {
+                            <tr>
+                                <td>@history.ChangedAt.ToString("yyyy/MM/dd HH:mm")</td>
+                                <td class="text-end">¥@history.Price.ToString("N0")</td>
+                                <td class="text-end">@(history.SalePrice.HasValue ? $"¥{history.SalePrice.Value:N0}" : "-")</td>
+                                <td>@history.ChangedBy</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <hr class="my-4" />
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>更新する</button>
+        <a href="/Admin/Products" class="btn btn-outline-secondary">キャンセル</a>
+    </div>
+</form>

@@ -1,0 +1,18 @@
+# ============================================================
+# SkiShop 開発環境用 .env ファイル
+# このファイルは .gitignore に含まれており Git にコミットされません。
+# 本番環境では Azure Key Vault 等を使用してください。
+# ============================================================
+
+# --- Azure OpenAI ---
+AZURE_OPENAI_ENDPOINT=https://AAAAA.openai.azure.com/
+AZURE_OPENAI_API_KEY=$YOUR_KEY
+AZURE_OPENAI_DEPLOYMENT_NAME=gpt-5
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME=text-embedding-3-small
+
+# --- Azure AI Search ---
+AZURE_AI_SEARCH_ENDPOINT=https://BBBBBB.search.windows.net
+AZURE_AI_SEARCH_API_KEY=$YOUR_KEY
+
+# --- JWT ---
+JWT_SECRET_KEY=dev-signing-key-minimum-32-characters-long

@@ -1,0 +1,236 @@
+@page "/products"
+@attribute [StreamRendering]
+@inject IProductApiClient ProductApi
+@inject NavigationManager Navigation
+
+<PageTitle>商品一覧 - Azure SkiShop</PageTitle>
+
+<HeadContent>
+    <meta name="description" content="Azure SkiShop の商品一覧。スキー、スノーボード、ウェア、アクセサリーを豊富に取り揃えています。" />
+    <meta property="og:title" content="商品一覧 - Azure SkiShop" />
+    <meta property="og:description" content="スキー・スノーボード用品を豊富に取り揃えた Azure SkiShop の商品一覧ページです。" />
+</HeadContent>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <!-- パンくずリスト -->
+    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4" />
+
+    <MudGrid Spacing="4">
+        <!-- サイドバーフィルター -->
+        <MudItem xs="12" md="3">
+            <MudPaper Elevation="2" Class="pa-4" Style="border-radius: 12px;">
+                <MudText Typo="Typo.h6" Class="mb-4">絞り込み</MudText>
+
+                <!-- カテゴリ -->
+                <MudText Typo="Typo.subtitle2" Class="mb-2">カテゴリ</MudText>
+                <MudSelect T="string" @bind-Value="_selectedCategory" Label="カテゴリ"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-4"
+                           Clearable="true">
+                    @foreach (var cat in _availableCategories)
+                    {
+                        <MudSelectItem T="string" Value="@cat">@cat</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <!-- 価格帯 -->
+                <MudText Typo="Typo.subtitle2" Class="mb-2">価格帯</MudText>
+                <MudStack Row="true" Spacing="2" Class="mb-4">
+                    <MudNumericField T="decimal?" @bind-Value="_minPrice" Label="最低" Format="N0"
+                                     Variant="Variant.Outlined" Margin="Margin.Dense"
+                                     Adornment="Adornment.Start" AdornmentText="¥" />
+                    <MudText Typo="Typo.body1" Class="align-self-center">〜</MudText>
+                    <MudNumericField T="decimal?" @bind-Value="_maxPrice" Label="最高" Format="N0"
+                                     Variant="Variant.Outlined" Margin="Margin.Dense"
+                                     Adornment="Adornment.Start" AdornmentText="¥" />
+                </MudStack>
+
+                <!-- 検索 -->
+                <MudTextField @bind-Value="_keyword" Label="キーワード"
+                              Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Class="mb-4" />
+
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                           OnClick="ApplyFilters" StartIcon="@Icons.Material.Filled.FilterList">
+                    絞り込む
+                </MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Secondary" FullWidth="true"
+                           OnClick="ClearFilters" Class="mt-2">
+                    フィルターをクリア
+                </MudButton>
+            </MudPaper>
+        </MudItem>
+
+        <!-- 商品一覧 -->
+        <MudItem xs="12" md="9">
+            <!-- ソート & 件数表示 -->
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+                <MudText Typo="Typo.body1" Style="color: #616161;">
+                    @if (_result is not null)
+                    {
+                        <span>@_result.TotalElements 件の商品</span>
+                    }
+                </MudText>
+                <MudSelect T="string" Value="_sortBy" Label="並び替え"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 220px;"
+                           ValueChanged="OnSortChanged">
+                    <MudSelectItem T="string" Value="@("createdAt,desc")">新着順</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("salesCount,desc")">人気順</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("price,asc")">価格が安い順</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("price,desc")">価格が高い順</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("averageRating,desc")">評価が高い順</MudSelectItem>
+                </MudSelect>
+            </MudStack>
+
+            @if (_isLoading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+                <MudGrid Spacing="4">
+                    @for (var i = 0; i < 8; i++)
+                    {
+                        <MudItem xs="12" sm="6" lg="4">
+                            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="220px" />
+                            <MudSkeleton Class="mt-2" />
+                            <MudSkeleton Width="60%" />
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+            else if (_result is not null && _result.Items.Count > 0)
+            {
+                <MudGrid Spacing="4">
+                    @foreach (var product in _result.Items)
+                    {
+                        <MudItem xs="12" sm="6" lg="4">
+                            <Frontend.Components.Shared.ProductCard Product="product" />
+                        </MudItem>
+                    }
+                </MudGrid>
+
+                <!-- ページネーション -->
+                <nav aria-label="ページネーション" class="d-flex justify-center mt-8">
+                    <MudPagination Count="@_result.TotalPages"
+                                   Selected="@(_currentPage + 1)"
+                                   SelectedChanged="OnPageChanged"
+                                   Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   BoundaryCount="1"
+                                   MiddleCount="3"
+                                   ShowFirstButton="true"
+                                   ShowLastButton="true" />
+                </nav>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info" Class="mt-4">
+                    条件に一致する商品が見つかりませんでした。フィルターを変更してお試しください。
+                </MudAlert>
+            }
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    [SupplyParameterFromQuery] public string? Category { get; set; }
+    [SupplyParameterFromQuery] public string? Keyword { get; set; }
+    [SupplyParameterFromQuery] public int? Page { get; set; }
+    [SupplyParameterFromQuery] public string? Sort { get; set; }
+
+    private PaginatedResult<ProductDto>? _result;
+    private bool _isLoading = true;
+    private int _currentPage;
+    private string _sortBy = "createdAt,desc";
+    private string? _selectedCategory;
+    private decimal? _minPrice;
+    private decimal? _maxPrice;
+    private string? _keyword;
+    private List<string> _availableCategories = [];
+
+    private readonly List<BreadcrumbItem> _breadcrumbs =
+    [
+        new("ホーム", href: "/"),
+        new("商品一覧", href: null, disabled: true)
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentPage = Page ?? 0;
+        _sortBy = Sort ?? "createdAt,desc";
+        _selectedCategory = Category;
+        _keyword = Keyword;
+
+        try
+        {
+            _availableCategories = await ProductApi.GetCategoriesAsync();
+        }
+        catch
+        {
+            _availableCategories = [];
+        }
+
+        await LoadProductsAsync();
+    }
+
+    private async Task LoadProductsAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _result = await ProductApi.GetProductsAsync(
+                page: _currentPage, size: 20, sort: _sortBy,
+                category: _selectedCategory, minPrice: _minPrice,
+                maxPrice: _maxPrice, keyword: _keyword);
+        }
+        catch
+        {
+            _result = null;
+        }
+        _isLoading = false;
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        _currentPage = page - 1;
+        await LoadProductsAsync();
+        UpdateUrl();
+    }
+
+    private async Task OnSortChanged(string sort)
+    {
+        _sortBy = sort;
+        _currentPage = 0;
+        await LoadProductsAsync();
+        UpdateUrl();
+    }
+
+    private async Task ApplyFilters()
+    {
+        _currentPage = 0;
+        await LoadProductsAsync();
+        UpdateUrl();
+    }
+
+    private async Task ClearFilters()
+    {
+        _selectedCategory = null;
+        _minPrice = null;
+        _maxPrice = null;
+        _keyword = null;
+        _currentPage = 0;
+        _sortBy = "createdAt,desc";
+        await LoadProductsAsync();
+        Navigation.NavigateTo("/products");
+    }
+
+    private void UpdateUrl()
+    {
+        var queryParts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(_selectedCategory)) queryParts.Add($"category={Uri.EscapeDataString(_selectedCategory)}");
+        if (!string.IsNullOrWhiteSpace(_keyword)) queryParts.Add($"keyword={Uri.EscapeDataString(_keyword)}");
+        if (_currentPage > 0) queryParts.Add($"page={_currentPage}");
+        if (_sortBy != "createdAt,desc") queryParts.Add($"sort={_sortBy}");
+
+        var url = queryParts.Count > 0 ? $"/products?{string.Join("&", queryParts)}" : "/products";
+        Navigation.NavigateTo(url, replace: true);
+    }
+}

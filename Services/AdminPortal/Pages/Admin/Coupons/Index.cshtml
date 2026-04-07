@@ -1,0 +1,303 @@
+@page
+@model AdminPortal.Pages.Admin.Coupons.IndexModel
+@{
+    ViewData["Title"] = "クーポン管理";
+    Layout = "/Pages/Admin/_Layout.cshtml";
+}
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="bi bi-ticket-perforated"></i> クーポン管理</h1>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            @Model.StatusMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link @(Model.ActiveTab == "list" ? "active" : "")"
+               asp-page="/Admin/Coupons/Index" asp-route-activeTab="list">クーポン一覧</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(Model.ActiveTab == "create" ? "active" : "")"
+               asp-page="/Admin/Coupons/Index" asp-route-activeTab="create">新規作成</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(Model.ActiveTab == "analytics" ? "active" : "")"
+               asp-page="/Admin/Coupons/Index" asp-route-activeTab="analytics">分析</a>
+        </li>
+    </ul>
+
+    @if (Model.ActiveTab == "list")
+    {
+        <div class="card mb-3">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <input type="hidden" name="ActiveTab" value="list" />
+                    <div class="col-md-4">
+                        <label class="form-label">ステータスフィルタ</label>
+                        <select name="StatusFilter" class="form-select" onchange="this.form.submit()">
+                            <option value="all" selected="@(Model.StatusFilter == "all")">すべて</option>
+                            <option value="active" selected="@(Model.StatusFilter == "active")">有効</option>
+                            <option value="expired" selected="@(Model.StatusFilter == "expired")">期限切れ</option>
+                            <option value="used" selected="@(Model.StatusFilter == "used")">使用済み</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>コード</th>
+                                <th>説明</th>
+                                <th>割引タイプ</th>
+                                <th>割引値</th>
+                                <th>開始日</th>
+                                <th>終了日</th>
+                                <th>使用回数</th>
+                                <th>ステータス</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.Coupons.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="9" class="text-center text-muted py-4">クーポンが見つかりません。</td>
+                                </tr>
+                            }
+                            @foreach (var coupon in Model.Coupons)
+                            {
+                                <tr>
+                                    <td><code>@coupon.Code</code></td>
+                                    <td>@coupon.Description</td>
+                                    <td>@(coupon.DiscountType == "Percentage" ? "割合" : "固定額")</td>
+                                    <td>@(coupon.DiscountType == "Percentage" ? $"{coupon.DiscountValue}%" : $"¥{coupon.DiscountValue:N0}")</td>
+                                    <td>@coupon.StartDate.ToString("yyyy/MM/dd")</td>
+                                    <td>@coupon.EndDate.ToString("yyyy/MM/dd")</td>
+                                    <td>@coupon.UsageCount / @(coupon.MaxUsage?.ToString() ?? "∞")</td>
+                                    <td>
+                                        <span class="badge bg-@(coupon.Status == "active" ? "success" : coupon.Status == "expired" ? "secondary" : "warning")">
+                                            @(coupon.Status == "active" ? "有効" : coupon.Status == "expired" ? "期限切れ" : "使用済み")
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <form method="post" asp-page-handler="Delete" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="couponId" value="@coupon.Id" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                    onclick="return confirm('このクーポンを削除しますか？')">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                @if (Model.TotalPages > 1)
+                {
+                    <nav aria-label="ページナビゲーション">
+                        <ul class="pagination justify-content-center">
+                            <li class="page-item @(Model.CurrentPage <= 1 ? "disabled" : "")">
+                                <a class="page-link" asp-page="/Admin/Coupons/Index"
+                                   asp-route-activeTab="list" asp-route-currentPage="@(Model.CurrentPage - 1)"
+                                   asp-route-statusFilter="@Model.StatusFilter">前へ</a>
+                            </li>
+                            @for (var i = 1; i <= Model.TotalPages; i++)
+                            {
+                                <li class="page-item @(i == Model.CurrentPage ? "active" : "")">
+                                    <a class="page-link" asp-page="/Admin/Coupons/Index"
+                                       asp-route-activeTab="list" asp-route-currentPage="@i"
+                                       asp-route-statusFilter="@Model.StatusFilter">@i</a>
+                                </li>
+                            }
+                            <li class="page-item @(Model.CurrentPage >= Model.TotalPages ? "disabled" : "")">
+                                <a class="page-link" asp-page="/Admin/Coupons/Index"
+                                   asp-route-activeTab="list" asp-route-currentPage="@(Model.CurrentPage + 1)"
+                                   asp-route-statusFilter="@Model.StatusFilter">次へ</a>
+                            </li>
+                        </ul>
+                    </nav>
+                }
+            </div>
+        </div>
+    }
+    else if (Model.ActiveTab == "create")
+    {
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">新規クーポン作成</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" asp-page-handler="Create">
+                    @Html.AntiForgeryToken()
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">クーポンコード</label>
+                            <input type="text" class="form-control" asp-for="NewCoupon.Code" required maxlength="50" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">割引タイプ</label>
+                            <select class="form-select" asp-for="NewCoupon.DiscountType">
+                                <option value="Percentage">割合（%）</option>
+                                <option value="Fixed">固定額（¥）</option>
+                            </select>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">説明</label>
+                            <input type="text" class="form-control" asp-for="NewCoupon.Description" maxlength="200" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">割引値</label>
+                            <input type="number" class="form-control" asp-for="NewCoupon.DiscountValue" step="0.01" min="0" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">開始日</label>
+                            <input type="date" class="form-control" asp-for="NewCoupon.StartDate" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">終了日</label>
+                            <input type="date" class="form-control" asp-for="NewCoupon.EndDate" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">最大使用回数（空欄＝無制限）</label>
+                            <input type="number" class="form-control" asp-for="NewCoupon.MaxUsage" min="1" />
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> 作成
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+    else if (Model.ActiveTab == "analytics")
+    {
+        @if (Model.Analytics is not null)
+        {
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="card text-white bg-primary">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">使用率</h6>
+                            <h2>@Model.Analytics.UsageRate.ToString("P1")</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-success">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">割引合計額</h6>
+                            <h2>¥@Model.Analytics.TotalDiscountAmount.ToString("N0")</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-info">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">発行数</h6>
+                            <h2>@Model.Analytics.TotalCouponsIssued</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-warning">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">使用数</h6>
+                            <h2>@Model.Analytics.TotalCouponsUsed</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">クーポン別使用状況</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>コード</th>
+                                    <th>使用回数</th>
+                                    <th>割引合計</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in Model.Analytics.PerCouponUsage)
+                                {
+                                    <tr>
+                                        <td><code>@item.Code</code></td>
+                                        <td>@item.UsageCount</td>
+                                        <td>¥@item.TotalDiscount.ToString("N0")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">使用履歴</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>日付</th>
+                                    <th>使用件数</th>
+                                    <th>割引額</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in Model.Analytics.UsageHistory)
+                                {
+                                    <tr>
+                                        <td>@item.Date.ToString("yyyy/MM/dd")</td>
+                                        <td>@item.Count</td>
+                                        <td>¥@item.Amount.ToString("N0")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">使用推移チャート</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-bar-chart-line" style="font-size: 3rem;"></i>
+                        <p class="mt-2">チャートは将来のバージョンで実装予定です。</p>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-warning">分析データの読み込みに失敗しました。</div>
+        }
+    }
+</div>

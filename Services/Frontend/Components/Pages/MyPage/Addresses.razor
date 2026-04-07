@@ -1,0 +1,245 @@
+@page "/mypage/addresses"
+@rendermode @(RenderMode.InteractiveServer)
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject Frontend.Services.Interfaces.IApiGatewayClient ApiClient
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject ILogger<Frontend.Components.Pages.MyPage.Addresses> Logger
+
+<PageTitle>住所管理 — Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack"
+               Href="/mypage" Class="mb-4">
+        マイページに戻る
+    </MudButton>
+
+    <div class="d-flex align-center justify-space-between mb-6">
+        <MudText Typo="Typo.h4" Style="font-weight: 700; color: #1565C0;">
+            <MudIcon Icon="@Icons.Material.Filled.LocationOn" Class="mr-2" />
+            住所管理
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="HandleAddAddressAsync"
+                   Style="min-height: 44px;">
+            新しい住所を追加
+        </MudButton>
+    </div>
+
+    @if (_isLoading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+    }
+    else if (_addresses.Count == 0)
+    {
+        <MudPaper Elevation="2" Class="pa-8 text-center rounded-lg">
+            <MudIcon Icon="@Icons.Material.Filled.LocationOff" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.h6" Class="mt-4" Color="Color.Secondary">
+                登録されている住所がありません
+            </MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                配送先住所を追加してください。
+            </MudText>
+        </MudPaper>
+    }
+    else
+    {
+        @foreach (var address in _addresses)
+        {
+            <MudPaper Elevation="2" Class="pa-6 mb-4 rounded-lg">
+                <div class="d-flex align-start justify-space-between">
+                    <div>
+                        <div class="d-flex align-center gap-2 mb-2">
+                            <MudText Typo="Typo.h6" Style="font-weight: 600;">
+                                @address.Label
+                            </MudText>
+                            @if (address.IsDefault)
+                            {
+                                <MudChip T="string" Color="Color.Primary" Size="Size.Small">デフォルト</MudChip>
+                            }
+                        </div>
+                        <MudText Typo="Typo.body1">〒@address.PostalCode</MudText>
+                        <MudText Typo="Typo.body1">
+                            @address.Prefecture @address.City @address.AddressLine1
+                        </MudText>
+                        @if (!string.IsNullOrEmpty(address.AddressLine2))
+                        {
+                            <MudText Typo="Typo.body1">@address.AddressLine2</MudText>
+                        }
+                        @if (!string.IsNullOrEmpty(address.PhoneNumber))
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1">
+                                <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" Class="mr-1" />
+                                @address.PhoneNumber
+                            </MudText>
+                        }
+                    </div>
+                    <div class="d-flex flex-column gap-1">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Color="Color.Primary"
+                                       OnClick="@(() => HandleEditAddressAsync(address))"
+                                       aria-label="編集" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Color="Color.Error"
+                                       OnClick="@(() => HandleDeleteAddressAsync(address))"
+                                       aria-label="削除" />
+                    </div>
+                </div>
+            </MudPaper>
+        }
+    }
+</MudContainer>
+
+@code {
+    private List<AddressDto> _addresses = [];
+    private bool _isLoading = true;
+    private string? _userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var profile = await ApiClient.GetAsync<UserProfileDto>("/api/v1/users/me");
+            _userId = profile?.Id;
+
+            if (_userId is not null)
+            {
+                await LoadAddressesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "住所データの読み込みに失敗: {Message}", ex.Message);
+            Snackbar.Add("住所データの読み込みに失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadAddressesAsync()
+    {
+        if (_userId is null) return;
+        _addresses = await ApiClient.GetAsync<List<AddressDto>>($"/api/v1/users/{_userId}/addresses") ?? [];
+    }
+
+    private async Task HandleAddAddressAsync()
+    {
+        var parameters = new DialogParameters<AddressFormDialog>
+        {
+            { x => x.DialogTitle, "新しい住所を追加" }
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialogRef = await DialogService.ShowAsync<AddressFormDialog>("新しい住所を追加", parameters, options);
+        var dialogResult = await dialogRef.GetReturnValueAsync<AddressFormModel?>();
+
+        if (dialogResult is { } model)
+        {
+            try
+            {
+                var request = new CreateAddressRequest(
+                    model.Label, model.PostalCode, model.Prefecture,
+                    model.City, model.AddressLine1, model.AddressLine2,
+                    model.PhoneNumber, model.IsDefault);
+
+                await ApiClient.PostAsync<CreateAddressRequest, AddressDto>(
+                    $"/api/v1/users/{_userId}/addresses", request);
+
+                await LoadAddressesAsync();
+                Snackbar.Add("住所を追加しました", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "住所の追加に失敗: {Message}", ex.Message);
+                Snackbar.Add("住所の追加に失敗しました", Severity.Error);
+            }
+        }
+    }
+
+    private async Task HandleEditAddressAsync(AddressDto address)
+    {
+        var parameters = new DialogParameters<AddressFormDialog>
+        {
+            { x => x.DialogTitle, "住所を編集" },
+            { x => x.Model, new AddressFormModel
+                {
+                    Label = address.Label,
+                    PostalCode = address.PostalCode,
+                    Prefecture = address.Prefecture,
+                    City = address.City,
+                    AddressLine1 = address.AddressLine1,
+                    AddressLine2 = address.AddressLine2,
+                    PhoneNumber = address.PhoneNumber,
+                    IsDefault = address.IsDefault
+                }
+            }
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialogRef = await DialogService.ShowAsync<AddressFormDialog>("住所を編集", parameters, options);
+        var dialogResult = await dialogRef.GetReturnValueAsync<AddressFormModel?>();
+
+        if (dialogResult is { } model)
+        {
+            try
+            {
+                var request = new UpdateAddressRequest(
+                    model.Label, model.PostalCode, model.Prefecture,
+                    model.City, model.AddressLine1, model.AddressLine2,
+                    model.PhoneNumber, model.IsDefault);
+
+                await ApiClient.PutAsync<UpdateAddressRequest, AddressDto>(
+                    $"/api/v1/users/{_userId}/addresses/{address.Id}", request);
+
+                await LoadAddressesAsync();
+                Snackbar.Add("住所を更新しました", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "住所の更新に失敗: {Message}", ex.Message);
+                Snackbar.Add("住所の更新に失敗しました", Severity.Error);
+            }
+        }
+    }
+
+    private async Task HandleDeleteAddressAsync(AddressDto address)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "住所の削除",
+            $"「{address.Label}」を削除してもよろしいですか？",
+            yesText: "削除する", cancelText: "キャンセル");
+
+        if (confirmed == true)
+        {
+            try
+            {
+                await ApiClient.DeleteAsync($"/api/v1/users/{_userId}/addresses/{address.Id}");
+                await LoadAddressesAsync();
+                Snackbar.Add("住所を削除しました", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "住所の削除に失敗: {Message}", ex.Message);
+                Snackbar.Add("住所の削除に失敗しました", Severity.Error);
+            }
+        }
+    }
+
+    private record UserProfileDto(string Id, string Email, string Name, string? PhoneNumber, string Role, DateTime CreatedAt);
+    private record AddressDto(string Id, string UserId, string Label, string PostalCode, string Prefecture, string City, string AddressLine1, string? AddressLine2, string? PhoneNumber, bool IsDefault);
+    private record CreateAddressRequest(string Label, string PostalCode, string Prefecture, string City, string AddressLine1, string? AddressLine2, string? PhoneNumber, bool IsDefault);
+    private record UpdateAddressRequest(string Label, string PostalCode, string Prefecture, string City, string AddressLine1, string? AddressLine2, string? PhoneNumber, bool IsDefault);
+
+    public class AddressFormModel
+    {
+        public string Label { get; set; } = string.Empty;
+        public string PostalCode { get; set; } = string.Empty;
+        public string Prefecture { get; set; } = string.Empty;
+        public string City { get; set; } = string.Empty;
+        public string AddressLine1 { get; set; } = string.Empty;
+        public string? AddressLine2 { get; set; }
+        public string? PhoneNumber { get; set; }
+        public bool IsDefault { get; set; }
+    }
+}

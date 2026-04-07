@@ -1,0 +1,33 @@
+::deep .skip-link {
+    position: absolute;
+    top: -100%;
+    left: 0;
+    z-index: 10000;
+    padding: 12px 24px;
+    background: #1565C0;
+    color: #FFFFFF;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 0 0 8px 0;
+    transition: top 0.2s;
+}
+
+::deep .skip-link:focus {
+    top: 0;
+}
+
+::deep .skishop-appbar {
+    background: linear-gradient(135deg, #1565C0 0%, #0D47A1 100%);
+    backdrop-filter: blur(10px);
+}
+
+::deep .skishop-brand {
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    font-family: 'Inter', sans-serif;
+}
+
+::deep .skishop-main {
+    min-height: calc(100vh - 64px);
+    background-color: #F5F7FA;
+}

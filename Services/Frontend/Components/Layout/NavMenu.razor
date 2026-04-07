@@ -1,0 +1,74 @@
+@inject IStringLocalizer<SharedResources> L
+@inject NavigationManager Navigation
+@inject Frontend.Services.Interfaces.IProductApiClient ProductApi
+
+<div class="d-flex align-center flex-nowrap">
+    <MudLink Href="/" Color="Color.Inherit" Underline="Underline.None" Class="mx-2"
+             Style="white-space:nowrap;">
+        @L["Nav_Home"]
+    </MudLink>
+    <MudMenu Label="@L["Nav_Category"]"
+             Color="Color.Inherit"
+             AnchorOrigin="Origin.BottomCenter"
+             TransformOrigin="Origin.TopCenter"
+             Dense="true"
+             aria-label="@L["Nav_CategoryMenu"]">
+        @foreach (var category in _categories)
+        {
+            <MudMenuItem Href="@($"/products?category={Uri.EscapeDataString(category)}")">
+                @category
+            </MudMenuItem>
+        }
+    </MudMenu>
+    <MudLink Href="/products" Color="Color.Inherit" Underline="Underline.None" Class="mx-2"
+             Style="white-space:nowrap;">
+        @L["Nav_Products"]
+    </MudLink>
+
+    <MudTextField T="string"
+                  @bind-Value="_searchText"
+                  Placeholder="@L["Nav_Search"]"
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Filled.Search"
+                  AdornmentColor="Color.Inherit"
+                  OnAdornmentClick="ExecuteSearch"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense"
+                  Immediate="true"
+                  OnKeyDown="HandleSearchKeyDown"
+                  Class="mx-2 d-none d-md-flex skishop-search"
+                  Style="min-width:200px;max-width:300px;"
+                  aria-label="@L["Products_Search"]" />
+</div>
+
+@code {
+    private string? _searchText;
+    private List<string> _categories = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _categories = await ProductApi.GetCategoriesAsync();
+        }
+        catch
+        {
+            _categories = [];
+        }
+    }
+
+    private void HandleSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key is "Enter")
+            ExecuteSearch();
+    }
+
+    private void ExecuteSearch()
+    {
+        if (!string.IsNullOrWhiteSpace(_searchText))
+        {
+            Navigation.NavigateTo($"/products?keyword={Uri.EscapeDataString(_searchText.Trim())}");
+            _searchText = string.Empty;
+        }
+    }
+}

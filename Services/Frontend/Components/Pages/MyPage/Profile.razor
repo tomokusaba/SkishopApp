@@ -1,0 +1,143 @@
+@page "/mypage/profile"
+@rendermode @(RenderMode.InteractiveServer)
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject Frontend.Services.Interfaces.IApiGatewayClient ApiClient
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject ILogger<Frontend.Components.Pages.MyPage.Profile> Logger
+
+<PageTitle>プロフィール編集 — Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack"
+               Href="/mypage" Class="mb-4">
+        マイページに戻る
+    </MudButton>
+
+    <MudPaper Elevation="4" Class="pa-8 rounded-lg">
+        <div class="text-center mb-6">
+            <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Primary" Size="Size.Large" />
+            <MudText Typo="Typo.h4" Class="mt-2" Style="font-weight: 700; color: #1565C0;">
+                プロフィール編集
+            </MudText>
+        </div>
+
+        @if (_isLoading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+        }
+        else
+        {
+            <MudForm @ref="_form" @bind-IsValid="_isFormValid">
+                <MudTextField @bind-Value="_email"
+                              Label="メールアドレス"
+                              ReadOnly="true"
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Email"
+                              Class="mb-4"
+                              HelperText="メールアドレスは変更できません" />
+
+                <MudTextField @bind-Value="_name"
+                              Label="名前"
+                              Required="true"
+                              RequiredError="名前は必須です"
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Badge"
+                              Class="mb-4"
+                              Counter="50"
+                              MaxLength="50" />
+
+                <MudTextField @bind-Value="_phoneNumber"
+                              Label="電話番号"
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Phone"
+                              Class="mb-4"
+                              Placeholder="090-1234-5678" />
+
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                    登録日: @_createdAt.ToString("yyyy/MM/dd")
+                </MudText>
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           OnClick="HandleSaveAsync"
+                           Disabled="@(!_isFormValid || _isSaving)"
+                           Style="min-height: 48px;">
+                    @if (_isSaving)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    }
+                    プロフィールを保存する
+                </MudButton>
+            </MudForm>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private MudForm? _form;
+    private bool _isFormValid;
+    private bool _isLoading = true;
+    private bool _isSaving;
+
+    private string _email = string.Empty;
+    private string _name = string.Empty;
+    private string? _phoneNumber;
+    private DateTime _createdAt;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var profile = await ApiClient.GetAsync<UserProfileDto>("/api/v1/users/me");
+            if (profile is not null)
+            {
+                _email = profile.Email;
+                _name = profile.Name;
+                _phoneNumber = profile.PhoneNumber;
+                _createdAt = profile.CreatedAt;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "プロフィールの読み込みに失敗: {Message}", ex.Message);
+            Snackbar.Add("プロフィールの読み込みに失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleSaveAsync()
+    {
+        if (_form is not null) await _form.Validate();
+        if (!_isFormValid) return;
+
+        _isSaving = true;
+
+        try
+        {
+            var request = new UpdateProfileRequest(_name, _phoneNumber);
+            await ApiClient.PutAsync<UpdateProfileRequest, UserProfileDto>("/api/v1/users/me", request);
+            Snackbar.Add("プロフィールを更新しました", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "プロフィール更新に失敗: {Message}", ex.Message);
+            Snackbar.Add("プロフィールの更新に失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private record UserProfileDto(string Id, string Email, string Name, string? PhoneNumber, string Role, DateTime CreatedAt);
+    private record UpdateProfileRequest(string Name, string? PhoneNumber);
+}

@@ -1,0 +1,9 @@
+target/
+!*/target/*.jar
+.git/
+.github/
+.idea/
+*.iml
+*.md
+design-docs/
+TMP/

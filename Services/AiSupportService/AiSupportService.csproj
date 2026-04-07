@@ -1,0 +1,64 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ORM -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.*" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.*" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.*" PrivateAssets="all" />
+
+    <!-- 認証 -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.*" />
+    <PackageReference Include="Microsoft.Identity.Web" Version="3.*" />
+
+    <!-- バリデーション -->
+    <PackageReference Include="FluentValidation" Version="11.*" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.*" />
+
+    <!-- メッセージング -->
+    <PackageReference Include="Confluent.Kafka" Version="2.*" />
+
+    <!-- キャッシュ -->
+    <PackageReference Include="StackExchange.Redis" Version="2.*" />
+
+    <!-- 耐障害性 -->
+    <PackageReference Include="Polly" Version="8.*" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.*" />
+
+    <!-- ロギング -->
+    <PackageReference Include="Serilog.AspNetCore" Version="8.*" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.*" />
+    <PackageReference Include="Serilog.Formatting.Compact" Version="3.*" />
+
+    <!-- OpenTelemetry -->
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.*" />
+
+    <!-- ヘルスチェック -->
+    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.*" />
+    <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="9.*" />
+
+    <!-- Semantic Kernel -->
+    <PackageReference Include="Microsoft.SemanticKernel" Version="1.*" />
+    <PackageReference Include="Microsoft.SemanticKernel.Connectors.AzureOpenAI" Version="1.*" />
+
+    <!-- Azure AI Search -->
+    <PackageReference Include="Azure.Search.Documents" Version="11.*" />
+
+    <!-- Azure Identity -->
+    <PackageReference Include="Azure.Identity" Version="1.*" />
+
+    <!-- OpenAPI -->
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.*" />
+  </ItemGroup>
+
+</Project>

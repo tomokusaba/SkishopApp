@@ -1,0 +1,127 @@
+@page "/auth/email/pending"
+@rendermode @(RenderMode.InteractiveServer)
+@inject NavigationManager Navigation
+@inject IAuthApiClient AuthApi
+
+<PageTitle>メール認証待ち — Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
+    <MudPaper Elevation="4" Class="pa-8 rounded-lg text-center">
+        <MudIcon Icon="@Icons.Material.Filled.MarkEmailRead" Color="Color.Primary"
+                 Style="font-size: 64px;" />
+        <MudText Typo="Typo.h5" Class="mt-4" Style="font-weight: 700; color: #1565C0;">
+            認証メールを送信しました
+        </MudText>
+        <MudText Typo="Typo.body1" Class="mt-2 mb-4" Color="Color.Secondary">
+            @MaskedEmail にメールをお送りしました。メール内のリンクをクリックして、アカウントを有効化してください。
+        </MudText>
+
+        <MudDivider Class="my-4" />
+
+        <MudText Typo="Typo.subtitle2" Class="mb-2">メールが届かない場合</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+            迷惑メールフォルダをご確認ください。数分待っても届かない場合は、再送信ボタンを押してください。
+        </MudText>
+
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Primary"
+                   OnClick="HandleResendAsync"
+                   Disabled="@(_isResending || _cooldownSeconds > 0)"
+                   Style="min-height: 44px;">
+            @if (_cooldownSeconds > 0)
+            {
+                <span>再送信可能まで @_cooldownSeconds 秒</span>
+            }
+            else if (_isResending)
+            {
+                <MudProgressCircular Color="Color.Inherit" Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>送信中...</span>
+            }
+            else
+            {
+                <span>認証メールを再送信する</span>
+            }
+        </MudButton>
+
+        @if (_resendSuccess)
+        {
+            <MudAlert Severity="Severity.Success" Class="mt-4" role="status">
+                認証メールを再送信しました
+            </MudAlert>
+        }
+
+        <div class="mt-6">
+            <MudLink Href="/auth/login" Typo="Typo.body2">ログイン画面に戻る</MudLink>
+        </div>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string? Email { get; set; }
+
+    private string MaskedEmail => MaskEmail(Email ?? "");
+    private bool _isResending;
+    private bool _resendSuccess;
+    private int _cooldownSeconds;
+    private System.Timers.Timer? _timer;
+
+    private async Task HandleResendAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Email) || _cooldownSeconds > 0) return;
+
+        _isResending = true;
+        _resendSuccess = false;
+
+        try
+        {
+            await AuthApi.ResendEmailVerificationAsync(Email);
+            _resendSuccess = true;
+            StartCooldown();
+        }
+        catch
+        {
+            _resendSuccess = false;
+        }
+        finally
+        {
+            _isResending = false;
+        }
+    }
+
+    private void StartCooldown()
+    {
+        _cooldownSeconds = 60;
+        _timer?.Dispose();
+        _timer = new System.Timers.Timer(1000);
+        _timer.Elapsed += (_, _) =>
+        {
+            _cooldownSeconds--;
+            if (_cooldownSeconds <= 0)
+            {
+                _timer?.Stop();
+                _timer?.Dispose();
+            }
+            InvokeAsync(StateHasChanged);
+        };
+        _timer.Start();
+    }
+
+    private static string MaskEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
+            return "***@***.***";
+
+        var parts = email.Split('@');
+        var local = parts[0];
+        var masked = local.Length > 1
+            ? $"{local[0]}***"
+            : "***";
+        return $"{masked}@{parts[1]}";
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+}

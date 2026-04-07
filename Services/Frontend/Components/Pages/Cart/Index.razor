@@ -1,0 +1,340 @@
+@page "/cart"
+@rendermode @(RenderMode.InteractiveServer)
+
+@inject ICartApiClient CartApi
+@inject ICouponApiClient CouponApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject ILogger<Index> Logger
+
+<PageTitle>カート - Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudText Typo="Typo.h4" Class="mb-6" Style="font-weight: 700;">
+        <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Class="mr-2" /> ショッピングカート
+    </MudText>
+
+    @if (_isLoading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_cart is null || _cart.Items.Count == 0)
+    {
+        <MudPaper Elevation="2" Class="pa-8 text-center" Style="border-radius: 12px;">
+            <MudIcon Icon="@Icons.Material.Filled.RemoveShoppingCart" Size="Size.Large" Color="Color.Default" Class="mb-4" />
+            <MudText Typo="Typo.h5" Class="mb-2">カートは空です</MudText>
+            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">商品を追加してショッピングをお楽しみください</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/products" StartIcon="@Icons.Material.Filled.Search">
+                商品を探す
+            </MudButton>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                @* Free shipping promotion banner *@
+                @if (_cart.Subtotal < 10000)
+                {
+                    <MudAlert Severity="Severity.Info" Class="mb-4" Icon="@Icons.Material.Filled.LocalShipping">
+                        あと ¥@((10000 - _cart.Subtotal).ToString("N0")) で送料無料！
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Success" Class="mb-4" Icon="@Icons.Material.Filled.LocalShipping">
+                        送料無料 🎉
+                    </MudAlert>
+                }
+
+                @foreach (var item in _cart.Items)
+                {
+                    <MudPaper Elevation="1" Class="pa-4 mb-3" Style="border-radius: 12px;">
+                        <MudGrid Spacing="2">
+                            <MudItem xs="3" sm="2">
+                                <MudImage Src="@(item.ImageUrl ?? "/images/no-image.webp")" Alt="@item.ProductName"
+                                          Width="80" Height="80" ObjectFit="ObjectFit.Contain"
+                                          Style="border-radius: 8px; background: #f5f5f5;" />
+                            </MudItem>
+                            <MudItem xs="9" sm="4">
+                                <MudLink Href="@($"/products/{item.ProductId}")" Underline="Underline.Hover">
+                                    <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">@item.ProductName</MudText>
+                                </MudLink>
+                                @if (!string.IsNullOrEmpty(item.Size))
+                                {
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">サイズ: @item.Size</MudText>
+                                }
+                                @if (!string.IsNullOrEmpty(item.Color))
+                                {
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">カラー: @item.Color</MudText>
+                                }
+                            </MudItem>
+                            <MudItem xs="6" sm="3">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
+                                                   Disabled="@(item.Quantity <= 1 || _isUpdating)"
+                                                   OnClick="@(() => UpdateQuantityAsync(item.Id, item.Quantity - 1))"
+                                                   aria-label="数量を減らす" />
+                                    <MudText Typo="Typo.body1" Style="min-width: 32px; text-align: center;">@item.Quantity</MudText>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                                                   Disabled="@(item.Quantity >= item.StockQuantity || _isUpdating)"
+                                                   OnClick="@(() => UpdateQuantityAsync(item.Id, item.Quantity + 1))"
+                                                   aria-label="数量を増やす" />
+                                </div>
+                            </MudItem>
+                            <MudItem xs="4" sm="2">
+                                <MudText Typo="Typo.subtitle1" Style="font-weight: 600; text-align: right;">
+                                    ¥@item.Subtotal.ToString("N0")
+                                </MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Style="text-align: right;">
+                                    ¥@item.UnitPrice.ToString("N0") × @item.Quantity
+                                </MudText>
+                            </MudItem>
+                            <MudItem xs="2" sm="1">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                               Disabled="@_isUpdating"
+                                               OnClick="@(() => RemoveItemAsync(item.Id))"
+                                               aria-label="@($"{item.ProductName} を削除")" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+                }
+
+                <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Filled.DeleteSweep"
+                           Disabled="@_isUpdating" OnClick="ClearCartAsync" Class="mt-2">
+                    カートを空にする
+                </MudButton>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                @* Coupon input *@
+                <MudPaper Elevation="2" Class="pa-4 mb-4" Style="border-radius: 12px;">
+                    <MudText Typo="Typo.subtitle1" Class="mb-2" Style="font-weight: 600;">クーポンコード</MudText>
+                    @if (string.IsNullOrEmpty(_cart.AppliedCouponCode))
+                    {
+                        <div style="display: flex; gap: 8px;">
+                            <MudTextField @bind-Value="_couponCode" Label="クーポンコード" Variant="Variant.Outlined"
+                                          Margin="Margin.Dense" Disabled="@_isValidatingCoupon" />
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(string.IsNullOrWhiteSpace(_couponCode) || _isValidatingCoupon)"
+                                       OnClick="ValidateCouponAsync" Style="min-width: 80px;">
+                                適用
+                            </MudButton>
+                        </div>
+                        @if (!string.IsNullOrEmpty(_couponError))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Error" Class="mt-1">@_couponError</MudText>
+                        }
+                    }
+                    else
+                    {
+                        <MudChip T="string" Color="Color.Success" OnClose="RemoveCouponAsync">
+                            @_cart.AppliedCouponCode 適用中
+                        </MudChip>
+                    }
+                </MudPaper>
+
+                @* Order summary *@
+                <MudPaper Elevation="2" Class="pa-4" Style="border-radius: 12px;">
+                    <MudText Typo="Typo.subtitle1" Class="mb-3" Style="font-weight: 600;">注文サマリー</MudText>
+                    <div class="summary-row"><span>小計（税抜）</span><span>¥@_cart.Subtotal.ToString("N0")</span></div>
+                    <div class="summary-row"><span>消費税（10%）</span><span>¥@_cart.Tax.ToString("N0")</span></div>
+                    <div class="summary-row">
+                        <span>送料</span>
+                        <span style="@(_cart.ShippingFee == 0 ? "color: #2e7d32;" : "")">
+                            @(_cart.ShippingFee == 0 ? "無料" : $"¥{_cart.ShippingFee:N0}")
+                        </span>
+                    </div>
+                    @if (_cart.CouponDiscount > 0)
+                    {
+                        <div class="summary-row" style="color: #d32f2f;"><span>クーポン割引</span><span>-¥@_cart.CouponDiscount.ToString("N0")</span></div>
+                    }
+                    <MudDivider Class="my-3" />
+                    <div class="summary-row total"><span>合計（税込）</span><span>¥@_cart.Total.ToString("N0")</span></div>
+                    @if (_cart.EarnablePoints > 0)
+                    {
+                        <div class="summary-row points"><span>獲得予定ポイント</span><span>@_cart.EarnablePoints pt</span></div>
+                    }
+
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                               Size="Size.Large" Class="mt-4"
+                               Disabled="@_isUpdating"
+                               OnClick="ProceedToCheckout"
+                               StartIcon="@Icons.Material.Filled.ShoppingCartCheckout">
+                        チェックアウトへ進む
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Text" Color="Color.Default" FullWidth="true" Class="mt-2"
+                               Href="/products">
+                        ショッピングを続ける
+                    </MudButton>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+<style>
+    .summary-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 0;
+        font-size: 0.95rem;
+    }
+    .summary-row.total {
+        font-weight: 700;
+        font-size: 1.2rem;
+        color: #0D47A1;
+    }
+    .summary-row.points {
+        color: #f57c00;
+        font-size: 0.9rem;
+    }
+</style>
+
+@code {
+    private CartDto? _cart;
+    private bool _isLoading = true;
+    private bool _isUpdating;
+    private bool _isValidatingCoupon;
+    private string? _couponCode;
+    private string? _couponError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCartAsync();
+    }
+
+    private async Task LoadCartAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _cart = await CartApi.GetCartAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "カート読み込みエラー");
+            Snackbar.Add("カートの読み込みに失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task UpdateQuantityAsync(string itemId, int newQuantity)
+    {
+        if (_cart is null) return;
+
+        var originalItems = _cart.Items.Select(i => i with { }).ToList();
+        var item = _cart.Items.FirstOrDefault(i => i.Id == itemId);
+        if (item is not null)
+        {
+            var idx = _cart.Items.IndexOf(item);
+            _cart.Items[idx] = item with { Quantity = newQuantity, Subtotal = item.UnitPrice * newQuantity };
+            StateHasChanged();
+        }
+
+        try
+        {
+            _isUpdating = true;
+            await CartApi.UpdateItemQuantityAsync(itemId, newQuantity);
+            _cart = await CartApi.GetCartAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "数量更新失敗: ItemId={ItemId}", itemId);
+            if (_cart is not null)
+            {
+                _cart = _cart with { Items = originalItems };
+            }
+            Snackbar.Add("数量の更新に失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isUpdating = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RemoveItemAsync(string itemId)
+    {
+        try
+        {
+            _isUpdating = true;
+            await CartApi.RemoveItemAsync(itemId);
+            _cart = await CartApi.GetCartAsync();
+            Snackbar.Add("商品を削除しました", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "アイテム削除失敗: ItemId={ItemId}", itemId);
+            Snackbar.Add("削除に失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isUpdating = false;
+        }
+    }
+
+    private async Task ClearCartAsync()
+    {
+        try
+        {
+            _isUpdating = true;
+            await CartApi.ClearCartAsync();
+            _cart = await CartApi.GetCartAsync();
+            Snackbar.Add("カートを空にしました", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "カートクリア失敗");
+            Snackbar.Add("カートのクリアに失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isUpdating = false;
+        }
+    }
+
+    private async Task ValidateCouponAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_couponCode) || _cart is null) return;
+
+        _isValidatingCoupon = true;
+        _couponError = null;
+        try
+        {
+            var result = await CouponApi.ValidateCouponAsync(_couponCode, _cart.Subtotal);
+            if (result?.IsValid == true)
+            {
+                _cart = await CartApi.GetCartAsync();
+                Snackbar.Add("クーポンを適用しました", Severity.Success);
+            }
+            else
+            {
+                _couponError = result?.ErrorMessage ?? "無効なクーポンコードです";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "クーポン検証失敗: Code={Code}", _couponCode);
+            _couponError = "クーポンの検証に失敗しました";
+        }
+        finally
+        {
+            _isValidatingCoupon = false;
+        }
+    }
+
+    private async Task RemoveCouponAsync()
+    {
+        _couponCode = null;
+        _cart = await CartApi.GetCartAsync();
+    }
+
+    private void ProceedToCheckout()
+    {
+        Navigation.NavigateTo("/checkout/cart");
+    }
+}

@@ -1,0 +1,477 @@
+@page "/orders/{OrderId}"
+@rendermode @(RenderMode.InteractiveServer)
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@inject IOrderApiClient OrderApi
+@inject IShipmentReturnApiClient ShipmentReturnApi
+@inject IProductApiClient ProductApi
+@inject ICartApiClient CartApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject ILogger<Detail> Logger
+
+<PageTitle>注文詳細 - Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4" />
+
+    @if (_isLoading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_order is null)
+    {
+        <MudAlert Severity="Severity.Error">注文が見つかりませんでした。</MudAlert>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/orders" Class="mt-4">
+            注文履歴に戻る
+        </MudButton>
+    }
+    else
+    {
+        @* Order Header *@
+        <MudPaper Elevation="2" Class="pa-6 mb-6" Style="border-radius: 12px;">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.h5" Style="font-weight: 700;">
+                        注文番号: @_order.OrderNumber
+                    </MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        注文日: @_order.CreatedAt.ToString("yyyy/MM/dd HH:mm")
+                    </MudText>
+                </MudStack>
+                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                    <OrderStatusBadge Status="@_order.Status" />
+                    @if (_returns.Count > 0)
+                    {
+                        @foreach (var ret in _returns)
+                        {
+                            <MudChip T="string" Size="Size.Small" Style="@GetReturnStatusStyle(ret.Status)">
+                                返品: @GetReturnStatusLabel(ret.Status)
+                            </MudChip>
+                        }
+                    }
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+
+        <MudGrid Spacing="4">
+            @* Items Table *@
+            <MudItem xs="12" md="8">
+                <MudPaper Elevation="2" Class="pa-4 mb-4" Style="border-radius: 12px;">
+                    <MudText Typo="Typo.h6" Class="mb-4">注文商品</MudText>
+                    <MudTable Items="_order.Items" Hover="true" Dense="true" Elevation="0" T="OrderItemDto">
+                        <HeaderContent>
+                            <MudTh>商品名</MudTh>
+                            <MudTh>サイズ</MudTh>
+                            <MudTh>カラー</MudTh>
+                            <MudTh Style="text-align: right;">数量</MudTh>
+                            <MudTh Style="text-align: right;">単価</MudTh>
+                            <MudTh Style="text-align: right;">小計</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="商品名">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    @if (!string.IsNullOrEmpty(context.ImageUrl))
+                                    {
+                                        <MudAvatar Size="Size.Medium" Rounded="true">
+                                            <MudImage Src="@context.ImageUrl" Alt="@context.ProductName" />
+                                        </MudAvatar>
+                                    }
+                                    <MudText>@context.ProductName</MudText>
+                                </MudStack>
+                            </MudTd>
+                            <MudTd DataLabel="サイズ">@(context.Size ?? "-")</MudTd>
+                            <MudTd DataLabel="カラー">@(context.Color ?? "-")</MudTd>
+                            <MudTd DataLabel="数量" Style="text-align: right;">@context.Quantity</MudTd>
+                            <MudTd DataLabel="単価" Style="text-align: right;">¥@context.UnitPrice.ToString("N0")</MudTd>
+                            <MudTd DataLabel="小計" Style="text-align: right; font-weight: 600;">
+                                ¥@context.Subtotal.ToString("N0")
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+
+                @* Delivery Tracking Timeline *@
+                @if (ShowTrackingTimeline())
+                {
+                    <MudPaper Elevation="2" Class="pa-4 mb-4" Style="border-radius: 12px;">
+                        <MudText Typo="Typo.h6" Class="mb-4">
+                            <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Class="mr-2" />配送状況
+                        </MudText>
+
+                        @if (_shipment?.TrackingNumber is not null)
+                        {
+                            <MudStack Row="true" Spacing="2" Class="mb-4" AlignItems="AlignItems.Center">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    追跡番号: @_shipment.TrackingNumber
+                                </MudText>
+                                @if (!string.IsNullOrEmpty(_shipment.CarrierTrackingUrl))
+                                {
+                                    <MudLink Href="@_shipment.CarrierTrackingUrl"
+                                             Target="_blank"
+                                             rel="noopener noreferrer"
+                                             Color="Color.Primary">
+                                        @(_shipment.CarrierName ?? "配送業者")サイトで確認
+                                        <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" />
+                                    </MudLink>
+                                }
+                            </MudStack>
+                        }
+
+                        <MudTimeline TimelinePosition="TimelinePosition.Start">
+                            @foreach (var step in _trackingSteps)
+                            {
+                                <MudTimelineItem Color="@(step.IsCompleted ? Color.Success : Color.Default)"
+                                                 Size="Size.Small"
+                                                 Icon="@step.Icon">
+                                    <MudText Typo="Typo.body1" Style="@(step.IsCompleted ? "font-weight: 600;" : "color: #9e9e9e;")">
+                                        @step.Label
+                                    </MudText>
+                                    @if (step.CompletedAt is not null)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @step.CompletedAt.Value.ToString("yyyy/MM/dd HH:mm")
+                                        </MudText>
+                                    }
+                                </MudTimelineItem>
+                            }
+                        </MudTimeline>
+                    </MudPaper>
+                }
+
+                @* Shipping Address *@
+                @if (_order.ShippingAddress is not null)
+                {
+                    <MudPaper Elevation="2" Class="pa-4 mb-4" Style="border-radius: 12px;">
+                        <MudText Typo="Typo.h6" Class="mb-3">
+                            <MudIcon Icon="@Icons.Material.Filled.LocationOn" Class="mr-2" />配送先
+                        </MudText>
+                        <MudText>@_order.ShippingAddress.FullName</MudText>
+                        <MudText Typo="Typo.body2">
+                            〒@_order.ShippingAddress.PostalCode
+                            @_order.ShippingAddress.Prefecture @_order.ShippingAddress.City
+                            @_order.ShippingAddress.AddressLine1
+                            @_order.ShippingAddress.AddressLine2
+                        </MudText>
+                        <MudText Typo="Typo.body2">TEL: @_order.ShippingAddress.PhoneNumber</MudText>
+                    </MudPaper>
+                }
+            </MudItem>
+
+            @* Amount Summary + Actions *@
+            <MudItem xs="12" md="4">
+                <MudPaper Elevation="2" Class="pa-4 mb-4" Style="border-radius: 12px;">
+                    <MudText Typo="Typo.h6" Class="mb-4">注文金額</MudText>
+                    <MudStack Spacing="1">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText>小計</MudText>
+                            <MudText>¥@_order.Subtotal.ToString("N0")</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText>消費税</MudText>
+                            <MudText>¥@_order.Tax.ToString("N0")</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText>送料</MudText>
+                            <MudText>
+                                @if (_order.ShippingFee == 0)
+                                {
+                                    <span style="color: #2e7d32;">無料</span>
+                                }
+                                else
+                                {
+                                    @($"¥{_order.ShippingFee:N0}")
+                                }
+                            </MudText>
+                        </MudStack>
+                        @if (_order.CouponDiscount > 0)
+                        {
+                            <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                <MudText Color="Color.Error">クーポン割引</MudText>
+                                <MudText Color="Color.Error">-¥@_order.CouponDiscount.ToString("N0")</MudText>
+                            </MudStack>
+                        }
+                        @if (_order.PointDiscount > 0)
+                        {
+                            <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                <MudText Color="Color.Error">ポイント使用</MudText>
+                                <MudText Color="Color.Error">-¥@_order.PointDiscount.ToString("N0")</MudText>
+                            </MudStack>
+                        }
+                        <MudDivider Class="my-2" />
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.h6" Style="font-weight: 700;">合計</MudText>
+                            <MudText Typo="Typo.h6" Style="font-weight: 700; color: #d32f2f;">
+                                ¥@_order.Total.ToString("N0")
+                            </MudText>
+                        </MudStack>
+                    </MudStack>
+                </MudPaper>
+
+                @* Action Buttons *@
+                <MudPaper Elevation="2" Class="pa-4" Style="border-radius: 12px;">
+                    <MudStack Spacing="2">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Secondary"
+                                   FullWidth="true"
+                                   OnClick="ReorderAsync"
+                                   Disabled="_isReordering"
+                                   StartIcon="@Icons.Material.Filled.Replay">
+                            再注文
+                        </MudButton>
+
+                        @if (CanCancel())
+                        {
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Error"
+                                       FullWidth="true"
+                                       OnClick="OpenCancelDialogAsync"
+                                       StartIcon="@Icons.Material.Filled.Cancel">
+                                注文をキャンセル
+                            </MudButton>
+                        }
+
+                        @if (CanReturn())
+                        {
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Warning"
+                                       FullWidth="true"
+                                       Href="@($"/orders/{OrderId}/return")"
+                                       StartIcon="@Icons.Material.Filled.AssignmentReturn">
+                                返品を申請
+                            </MudButton>
+                        }
+
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Primary"
+                                   FullWidth="true"
+                                   Href="/orders"
+                                   StartIcon="@Icons.Material.Filled.ArrowBack">
+                            注文一覧に戻る
+                        </MudButton>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    [Parameter] public string OrderId { get; set; } = string.Empty;
+
+    private OrderDto? _order;
+    private ShipmentDto? _shipment;
+    private List<ReturnDto> _returns = [];
+    private List<TrackingStep> _trackingSteps = [];
+    private bool _isLoading = true;
+    private bool _isReordering;
+
+    private List<BreadcrumbItem> _breadcrumbs = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _breadcrumbs =
+        [
+            new("ホーム", href: "/"),
+            new("注文履歴", href: "/orders"),
+            new("注文詳細", href: null, disabled: true)
+        ];
+
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+
+        try
+        {
+            var orderTask = OrderApi.GetOrderAsync(OrderId);
+            var shipmentTask = ShipmentReturnApi.GetShipmentByOrderAsync(OrderId);
+            var returnsTask = ShipmentReturnApi.GetReturnsByOrderAsync(OrderId);
+
+            await Task.WhenAll(orderTask, shipmentTask, returnsTask);
+
+            _order = await orderTask;
+            _shipment = await shipmentTask;
+            _returns = await returnsTask;
+
+            if (_order is not null)
+            {
+                BuildTrackingSteps();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "注文詳細の読み込みに失敗しました: OrderId={OrderId}", OrderId);
+            Snackbar.Add("注文情報の読み込みに失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private bool ShowTrackingTimeline()
+    {
+        if (_order is null) return false;
+        var status = _order.Status.ToUpperInvariant();
+        return status is "CONFIRMED" or "PREPARING" or "SHIPPED" or "DELIVERED";
+    }
+
+    private bool CanCancel()
+    {
+        if (_order is null) return false;
+        var status = _order.Status.ToUpperInvariant();
+        return status is "PENDING" or "CONFIRMED" or "PROCESSING";
+    }
+
+    private bool CanReturn()
+    {
+        if (_order is null) return false;
+        if (_order.Status.ToUpperInvariant() != "DELIVERED") return false;
+
+        var deliveredEvent = _shipment?.Events
+            .FirstOrDefault(e => e.Status.ToUpperInvariant() == "DELIVERED");
+        if (deliveredEvent is null) return false;
+
+        return (DateTime.UtcNow - deliveredEvent.OccurredAt).TotalDays <= 14;
+    }
+
+    private void BuildTrackingSteps()
+    {
+        var events = _shipment?.Events ?? [];
+        var stepDefinitions = new (string Status, string Label, string Icon)[]
+        {
+            ("CONFIRMED", "注文確定", Icons.Material.Filled.CheckCircle),
+            ("PREPARING", "発送準備", Icons.Material.Filled.Inventory),
+            ("SHIPPED", "発送済み", Icons.Material.Filled.LocalShipping),
+            ("IN_TRANSIT", "輸送中", Icons.Material.Filled.Flight),
+            ("DELIVERED", "配達完了", Icons.Material.Filled.Done)
+        };
+
+        _trackingSteps = stepDefinitions.Select(def =>
+        {
+            var matchedEvent = events.FirstOrDefault(e =>
+                e.Status.Equals(def.Status, StringComparison.OrdinalIgnoreCase));
+            return new TrackingStep(def.Label, def.Icon, matchedEvent is not null, matchedEvent?.OccurredAt);
+        }).ToList();
+    }
+
+    private async Task OpenCancelDialogAsync()
+    {
+        var parameters = new DialogParameters<CancelOrderDialog>
+        {
+            { x => x.OrderNumber, _order!.OrderNumber }
+        };
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseOnEscapeKey = true
+        };
+
+        var dialogRef = await DialogService.ShowAsync<CancelOrderDialog>("注文キャンセル", parameters, options);
+        var dialogResult = await dialogRef.GetReturnValueAsync<string?>();
+
+        if (dialogResult is not null)
+        {
+            try
+            {
+                await OrderApi.CancelOrderAsync(OrderId);
+                Snackbar.Add("注文をキャンセルしました", Severity.Success);
+                await LoadDataAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "注文キャンセルに失敗しました: OrderId={OrderId}", OrderId);
+                Snackbar.Add("キャンセル処理中にエラーが発生しました", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ReorderAsync()
+    {
+        if (_order is null) return;
+
+        _isReordering = true;
+        StateHasChanged();
+
+        try
+        {
+            var skippedItems = new List<string>();
+
+            var productTasks = _order.Items
+                .Select(item => ProductApi.GetProductByIdAsync(item.ProductId))
+                .ToList();
+            var products = await Task.WhenAll(productTasks);
+
+            var cartItems = new List<AddCartItemRequest>();
+            for (var i = 0; i < _order.Items.Count; i++)
+            {
+                var item = _order.Items[i];
+                var product = products[i];
+                if (product is null || product.StockQuantity <= 0)
+                {
+                    skippedItems.Add(item.ProductName);
+                    continue;
+                }
+
+                var quantity = Math.Min(item.Quantity, product.StockQuantity);
+                cartItems.Add(new AddCartItemRequest(item.ProductId, quantity, item.Size, item.Color));
+            }
+
+            foreach (var cartItem in cartItems)
+            {
+                await CartApi.AddItemAsync(cartItem);
+            }
+
+            if (skippedItems.Count > 0)
+            {
+                Snackbar.Add($"以下の商品は在庫切れのためスキップしました: {string.Join(", ", skippedItems)}", Severity.Warning);
+            }
+
+            if (skippedItems.Count < _order.Items.Count)
+            {
+                Snackbar.Add("カートに商品を追加しました", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("全ての商品が在庫切れです", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "再注文処理に失敗しました: OrderId={OrderId}", _order.Id);
+            Snackbar.Add("再注文処理中にエラーが発生しました", Severity.Error);
+        }
+        finally
+        {
+            _isReordering = false;
+            StateHasChanged();
+        }
+    }
+
+    private static string GetReturnStatusLabel(string status) => status.ToUpperInvariant() switch
+    {
+        "REQUESTED" => "申請中",
+        "APPROVED" => "承認済み",
+        "REJECTED" => "却下",
+        "RETURNED" => "返品完了",
+        "REFUNDED" => "返金済み",
+        _ => status
+    };
+
+    private static string GetReturnStatusStyle(string status) => status.ToUpperInvariant() switch
+    {
+        "REQUESTED" => "background-color: #FFF9C4; color: #F57F17;",
+        "APPROVED" => "background-color: #BBDEFB; color: #1565C0;",
+        "REJECTED" => "background-color: #FFCDD2; color: #C62828;",
+        "RETURNED" => "background-color: #C8E6C9; color: #2E7D32;",
+        "REFUNDED" => "background-color: #C8E6C9; color: #2E7D32;",
+        _ => ""
+    };
+
+    private sealed record TrackingStep(string Label, string Icon, bool IsCompleted, DateTime? CompletedAt);
+}

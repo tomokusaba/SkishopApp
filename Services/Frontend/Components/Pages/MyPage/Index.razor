@@ -1,0 +1,213 @@
+@page "/mypage"
+@rendermode @(RenderMode.InteractiveServer)
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject Frontend.Services.Interfaces.IApiGatewayClient ApiClient
+@inject IOrderApiClient OrderApi
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject ILogger<Frontend.Components.Pages.MyPage.Index> Logger
+
+<PageTitle>マイページ — Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudText Typo="Typo.h4" Class="mb-6" Style="font-weight: 700; color: #1565C0;">
+        <MudIcon Icon="@Icons.Material.Filled.Person" Class="mr-2" />
+        マイページ
+    </MudText>
+
+    @if (_isLoading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+    }
+    else
+    {
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudPaper Elevation="2" Class="pa-6 mb-4 rounded-lg">
+                    <div class="d-flex align-center gap-4 mb-4">
+                        <MudAvatar Size="Size.Large" Color="Color.Primary">
+                            @(_profile?.Name?.FirstOrDefault().ToString() ?? "U")
+                        </MudAvatar>
+                        <div>
+                            <MudText Typo="Typo.h5" Style="font-weight: 600;">
+                                @(_profile?.Name ?? "ユーザー")
+                            </MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                @(_profile?.Email ?? "")
+                            </MudText>
+                        </div>
+                    </div>
+
+                    @if (_memberRank is not null)
+                    {
+                        <MudChip T="string" Color="Color.Primary" Size="Size.Small"
+                                 Icon="@Icons.Material.Filled.Star">
+                            @_memberRank.RankName
+                        </MudChip>
+                    }
+                </MudPaper>
+
+                <MudPaper Elevation="2" Class="pa-6 mb-4 rounded-lg">
+                    <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 600;">
+                        <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Class="mr-2" />
+                        ポイント残高
+                    </MudText>
+
+                    <MudText Typo="Typo.h3" Color="Color.Primary" Style="font-weight: 700;">
+                        @_pointBalance.ToString("N0") <span style="font-size: 1rem;">pt</span>
+                    </MudText>
+
+                    @if (_expiringPoints > 0 && _expiryDate.HasValue)
+                    {
+                        <PointExpiryAlert ExpiringPoints="@_expiringPoints" ExpiryDate="@_expiryDate.Value" />
+                    }
+                </MudPaper>
+
+                <MudPaper Elevation="2" Class="pa-6 mb-4 rounded-lg">
+                    <div class="d-flex align-center justify-space-between mb-4">
+                        <MudText Typo="Typo.h6" Style="font-weight: 600;">
+                            <MudIcon Icon="@Icons.Material.Filled.ShoppingBag" Class="mr-2" />
+                            最近の注文
+                        </MudText>
+                        <MudButton Variant="Variant.Text" Color="Color.Primary"
+                                   Href="/mypage/orders" EndIcon="@Icons.Material.Filled.ArrowForward">
+                            すべて見る
+                        </MudButton>
+                    </div>
+
+                    @if (_recentOrders.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            まだ注文がありません。
+                        </MudText>
+                    }
+                    else
+                    {
+                        @foreach (var order in _recentOrders)
+                        {
+                            <MudPaper Elevation="0" Class="pa-4 mb-2" Style="background: #f5f5f5; border-radius: 8px;">
+                                <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+                                    <div>
+                                        <MudText Typo="Typo.body1" Style="font-weight: 600;">
+                                            注文番号: @order.OrderNumber
+                                        </MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                            @order.CreatedAt.ToString("yyyy/MM/dd HH:mm")
+                                        </MudText>
+                                    </div>
+                                    <div class="d-flex align-center gap-2">
+                                        <OrderStatusBadge Status="@order.Status" />
+                                        <MudText Typo="Typo.body1" Style="font-weight: 600;">
+                                            ¥@order.Total.ToString("N0")
+                                        </MudText>
+                                    </div>
+                                </div>
+                            </MudPaper>
+                        }
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudPaper Elevation="2" Class="pa-4 rounded-lg">
+                    <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 600;">
+                        クイックリンク
+                    </MudText>
+
+                    <MudList T="string" Dense="true">
+                        <MudListItem Icon="@Icons.Material.Filled.Edit"
+                                     Href="/mypage/profile"
+                                     IconColor="Color.Primary">
+                            プロフィール編集
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.ShoppingBag"
+                                     Href="/mypage/orders"
+                                     IconColor="Color.Primary">
+                            注文履歴
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.LocationOn"
+                                     Href="/mypage/addresses"
+                                     IconColor="Color.Primary">
+                            住所管理
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Lock"
+                                     Href="/mypage/password"
+                                     IconColor="Color.Warning">
+                            パスワード変更
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Security"
+                                     Href="/mypage/security/mfa"
+                                     IconColor="Color.Warning">
+                            MFA設定
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.History"
+                                     Href="/mypage/activities"
+                                     IconColor="Color.Secondary">
+                            アクティビティ履歴
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Settings"
+                                     Href="/mypage/settings"
+                                     IconColor="Color.Secondary">
+                            ユーザー設定
+                        </MudListItem>
+                    </MudList>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    private UserProfileDto? _profile;
+    private MemberRankDto? _memberRank;
+    private int _pointBalance;
+    private int _expiringPoints;
+    private DateTime? _expiryDate;
+    private List<OrderDto> _recentOrders = [];
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var profileTask = ApiClient.GetAsync<UserProfileDto>("/api/v1/users/me");
+            var pointsTask = ApiClient.GetAsync<PointBalanceResponse>("/api/v1/points/balance");
+            var expiringTask = ApiClient.GetAsync<PointExpiringResponse>("/api/v1/points/expiring");
+
+            await Task.WhenAll(profileTask, pointsTask, expiringTask);
+
+            _profile = await profileTask;
+            var pointsResult = await pointsTask;
+            _pointBalance = pointsResult?.Balance ?? 0;
+
+            var expiringResult = await expiringTask;
+            _expiringPoints = expiringResult?.ExpiringPoints ?? 0;
+            _expiryDate = expiringResult?.ExpiryDate;
+
+            if (_profile is not null)
+            {
+                var rankTask = ApiClient.GetAsync<MemberRankDto>($"/api/v1/users/{_profile.Id}/member-rank");
+                var ordersTask = OrderApi.GetCustomerOrdersAsync(_profile.Id, 0, 3);
+
+                await Task.WhenAll(rankTask, ordersTask);
+
+                _memberRank = await rankTask;
+                _recentOrders = await ordersTask;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "マイページデータの読み込みに失敗: {Message}", ex.Message);
+            Snackbar.Add("データの読み込みに失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private record UserProfileDto(string Id, string Email, string Name, string? PhoneNumber, string Role, DateTime CreatedAt);
+    private record MemberRankDto(string RankName, string? Description, int CurrentPoints, int? NextRankThreshold, List<string>? Benefits);
+    private record PointBalanceResponse(int Balance);
+    private record PointExpiringResponse(int ExpiringPoints, DateTime? ExpiryDate);
+}

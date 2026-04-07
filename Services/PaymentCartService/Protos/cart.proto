@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package skishop.cart.v1;
+
+option csharp_namespace = "SkiShop.Contracts.Cart.V1";
+
+service CartGrpcService {
+  rpc GetCartSnapshot(GetCartSnapshotRequest) returns (GetCartSnapshotResponse);
+  rpc ClearCart(ClearCartRequest) returns (ClearCartResponse);
+}
+
+message GetCartSnapshotRequest {
+  string cart_id = 1;
+}
+
+message GetCartSnapshotResponse {
+  string cart_id = 1;
+  string customer_id = 2;
+  repeated CartItemSnapshot items = 3;
+  int64 total_amount_minor_units = 4;
+  string currency_code = 5;
+}
+
+message CartItemSnapshot {
+  string product_id = 1;
+  string product_name = 2;
+  string sku = 3;
+  int64 unit_price_minor_units = 4;
+  int32 quantity = 5;
+  int64 subtotal_minor_units = 6;
+}
+
+message ClearCartRequest {
+  string cart_id = 1;
+}
+
+message ClearCartResponse {
+  bool success = 1;
+  string message = 2;
+}

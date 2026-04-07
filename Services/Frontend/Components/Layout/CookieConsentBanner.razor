@@ -1,0 +1,213 @@
+@namespace Frontend.Components.Layout
+@using System.Text.Json
+@rendermode @(RenderMode.InteractiveServer)
+
+@inject IJSRuntime JS
+@inject ILogger<CookieConsentBanner> Logger
+@inject IStringLocalizer<SharedResources> L
+
+@* §15.1 準拠 — Cookie 同意バナー *@
+
+@if (_isVisible)
+{
+    <div role="dialog"
+         aria-label="@L["Cookie_Title"]"
+         aria-describedby="cookie-description"
+         style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 1100; background-color: #FFFFFF; box-shadow: 0 -4px 12px rgba(0,0,0,0.15);"
+         @onkeydown="HandleKeyDown">
+        <MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+            <MudText Typo="Typo.h6" Class="mb-2">@L["Cookie_Title"]</MudText>
+            <MudText id="cookie-description" Typo="Typo.body2" Class="mb-3">
+                @L["Cookie_Description"]
+                <MudLink Href="/privacy" Typo="Typo.body2">@L["Cookie_Detail"]</MudLink>
+            </MudText>
+
+            <MudExpansionPanels MultiExpansion="true" Elevation="0" Class="mb-3">
+                <MudExpansionPanel Text="@L["Cookie_Marketing"]">
+                    <MudText Typo="Typo.body2" Class="mb-2">
+                        @L["Cookie_Marketing_Desc"]
+                    </MudText>
+                    <MudSwitch @bind-Value="_marketingEnabled"
+                               Color="Color.Primary"
+                               Label="@L["Cookie_Marketing_Label"]" />
+                </MudExpansionPanel>
+                <MudExpansionPanel Text="@L["Cookie_Analytics"]">
+                    <MudText Typo="Typo.body2" Class="mb-2">
+                        @L["Cookie_Analytics_Desc"]
+                    </MudText>
+                    <MudSwitch @bind-Value="_analyticsEnabled"
+                               Color="Color.Primary"
+                               Label="@L["Cookie_Analytics_Label"]" />
+                </MudExpansionPanel>
+                <MudExpansionPanel Text="@L["Cookie_Personalization"]">
+                    <MudText Typo="Typo.body2" Class="mb-2">
+                        @L["Cookie_Personalization_Desc"]
+                    </MudText>
+                    <MudSwitch @bind-Value="_personalizationEnabled"
+                               Color="Color.Primary"
+                               Label="@L["Cookie_Personalization_Label"]" />
+                </MudExpansionPanel>
+                <MudExpansionPanel Text="@L["Cookie_ThirdParty"]">
+                    <MudText Typo="Typo.body2" Class="mb-2">
+                        @L["Cookie_ThirdParty_Desc"]
+                    </MudText>
+                    <MudSwitch @bind-Value="_thirdPartyEnabled"
+                               Color="Color.Primary"
+                               Label="@L["Cookie_ThirdParty_Label"]" />
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+
+            <MudStack Row="true" Spacing="2" Justify="Justify.FlexEnd" AlignItems="AlignItems.Center">
+                <MudButton Variant="Variant.Text"
+                           Color="Color.Default"
+                           OnClick="SaveCurrentSettings">
+                    @L["Cookie_Customize"]
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Secondary"
+                           OnClick="AcceptMinimumOnly">
+                    @L["Cookie_RejectAll"]
+                </MudButton>
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           OnClick="AcceptAll">
+                    @L["Cookie_AcceptAll"]
+                </MudButton>
+            </MudStack>
+        </MudContainer>
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    @inject IUserApiClient UserApi
+
+    private bool _isVisible;
+    private bool _marketingEnabled;
+    private bool _analyticsEnabled;
+    private bool _personalizationEnabled;
+    private bool _thirdPartyEnabled;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            var stored = await JS.InvokeAsync<string?>("localStorage.getItem", "cookieConsent");
+            if (string.IsNullOrEmpty(stored))
+            {
+                _isVisible = true;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Cookie 同意状態の読み取りに失敗");
+            _isVisible = true;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task AcceptAll()
+    {
+        _marketingEnabled = true;
+        _analyticsEnabled = true;
+        _personalizationEnabled = true;
+        _thirdPartyEnabled = true;
+        await SaveConsentAsync();
+    }
+
+    private async Task AcceptMinimumOnly()
+    {
+        _marketingEnabled = false;
+        _analyticsEnabled = false;
+        _personalizationEnabled = false;
+        _thirdPartyEnabled = false;
+        await SaveConsentAsync();
+    }
+
+    private async Task SaveCurrentSettings()
+    {
+        await SaveConsentAsync();
+    }
+
+    private async Task SaveConsentAsync()
+    {
+        var consent = new CookieConsentState(
+            _marketingEnabled,
+            _analyticsEnabled,
+            _personalizationEnabled,
+            _thirdPartyEnabled,
+            DateTime.UtcNow);
+
+        try
+        {
+            var json = JsonSerializer.Serialize(consent);
+            await JS.InvokeVoidAsync("localStorage.setItem", "cookieConsent", json);
+            Logger.LogInformation(
+                "Cookie 同意保存: Marketing={Marketing}, Analytics={Analytics}, Personalization={Personalization}, ThirdParty={ThirdParty}",
+                consent.Marketing, consent.Analytics, consent.Personalization, consent.ThirdParty);
+
+            await TrySaveToServerAsync(consent);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Cookie 同意保存に失敗");
+        }
+
+        _isVisible = false;
+    }
+
+    private async Task TrySaveToServerAsync(CookieConsentState consent)
+    {
+        if (AuthState is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var authState = await AuthState;
+            var userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (userId is null)
+            {
+                return;
+            }
+
+            var request = new UpdateConsentsRequest(
+            [
+                new ConsentUpdateItem("MARKETING", consent.Marketing),
+                new ConsentUpdateItem("ANALYTICS", consent.Analytics),
+                new ConsentUpdateItem("PERSONALIZATION", consent.Personalization),
+                new ConsentUpdateItem("THIRD_PARTY", consent.ThirdParty)
+            ]);
+
+            await UserApi.UpdateConsentsAsync(userId, request);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "サーバーへの同意情報同期に失敗");
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            await AcceptMinimumOnly();
+        }
+    }
+
+    private record CookieConsentState(
+        bool Marketing,
+        bool Analytics,
+        bool Personalization,
+        bool ThirdParty,
+        DateTime ConsentedAt);
+}

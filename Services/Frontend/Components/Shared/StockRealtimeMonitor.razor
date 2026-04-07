@@ -1,0 +1,106 @@
+@namespace Frontend.Components.Shared
+@using Microsoft.AspNetCore.SignalR.Client
+@rendermode @(RenderMode.InteractiveServer)
+@implements IAsyncDisposable
+
+@inject NavigationManager Navigation
+@inject ILogger<StockRealtimeMonitor> Logger
+
+@* §16.3 準拠 — SignalR による在庫リアルタイム監視コンポーネント *@
+
+<StockBadge StockQuantity="@_currentStock" />
+
+@code {
+    [Parameter, EditorRequired]
+    public string ProductId { get; set; } = string.Empty;
+
+    [Parameter]
+    public int InitialStock { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnStockChanged { get; set; }
+
+    private HubConnection? _hubConnection;
+    private int _currentStock;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentStock = InitialStock;
+        await InitializeSignalRAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_currentStock != InitialStock && _hubConnection is null)
+        {
+            _currentStock = InitialStock;
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private async Task InitializeSignalRAsync()
+    {
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/stock"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.On<StockChangeEvent>("StockChanged", async (stockEvent) =>
+        {
+            if (stockEvent.ProductId != ProductId)
+            {
+                return;
+            }
+
+            var previousStock = _currentStock;
+            _currentStock = stockEvent.CurrentStock;
+
+            Logger.LogInformation(
+                "在庫変更通知: ProductId={ProductId}, Previous={PreviousStock}, Current={CurrentStock}",
+                stockEvent.ProductId, stockEvent.PreviousStock, stockEvent.CurrentStock);
+
+            if (OnStockChanged.HasDelegate)
+            {
+                await OnStockChanged.InvokeAsync(_currentStock);
+            }
+
+            await InvokeAsync(StateHasChanged);
+        });
+
+        try
+        {
+            await _hubConnection.StartAsync(CancellationToken.None);
+            await _hubConnection.InvokeAsync("JoinProductGroup", ProductId, CancellationToken.None);
+            Logger.LogInformation("在庫 SignalR 接続確立: ProductId={ProductId}", ProductId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "在庫 SignalR 接続失敗: ProductId={ProductId}", ProductId);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+        {
+            try
+            {
+                await _hubConnection.InvokeAsync("LeaveProductGroup", ProductId, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "在庫 SignalR グループ離脱時エラー: ProductId={ProductId}", ProductId);
+            }
+
+            try
+            {
+                await _hubConnection.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "在庫 SignalR 切断時エラー: ProductId={ProductId}", ProductId);
+            }
+        }
+    }
+}

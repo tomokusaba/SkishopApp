@@ -1,0 +1,187 @@
+@namespace Frontend.Components.Shared
+@using Microsoft.AspNetCore.SignalR.Client
+@rendermode @(RenderMode.InteractiveServer)
+@implements IAsyncDisposable
+
+@inject NavigationManager Navigation
+@inject ILogger<OrderStatusMonitor> Logger
+
+@* §16.3 準拠 — SignalR による注文ステータスリアルタイム監視（ポーリングフォールバック付き） *@
+
+<OrderStatusBadge Status="@_currentStatus" />
+
+@if (!string.IsNullOrEmpty(_statusMessage))
+{
+    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-2">
+        @_statusMessage
+    </MudText>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public string OrderId { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<OrderStatusEvent> OnStatusChanged { get; set; }
+
+    private HubConnection? _hubConnection;
+    private PeriodicTimer? _pollingTimer;
+    private CancellationTokenSource? _pollingCts;
+    private string _currentStatus = "PENDING";
+    private string? _statusMessage;
+    private bool _isTerminal;
+
+    private static readonly HashSet<string> TerminalStatuses = ["CONFIRMED", "FAILED", "CANCELLED", "DELIVERED", "RETURNED", "REFUNDED"];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await InitializeSignalRAsync();
+    }
+
+    private async Task InitializeSignalRAsync()
+    {
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/orders"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.On<OrderStatusEvent>("OrderStatusChanged", async (statusEvent) =>
+        {
+            if (statusEvent.OrderId != OrderId)
+            {
+                return;
+            }
+
+            await HandleStatusChangeAsync(statusEvent);
+        });
+
+        _hubConnection.Reconnecting += (ex) =>
+        {
+            Logger.LogWarning(ex, "注文 SignalR 再接続中: OrderId={OrderId}", OrderId);
+            return Task.CompletedTask;
+        };
+
+        _hubConnection.Closed += async (ex) =>
+        {
+            if (!_isTerminal)
+            {
+                Logger.LogWarning(ex, "注文 SignalR 接続断: ポーリングフォールバック開始 OrderId={OrderId}", OrderId);
+                await StartPollingFallbackAsync();
+            }
+        };
+
+        try
+        {
+            await _hubConnection.StartAsync(CancellationToken.None);
+            await _hubConnection.InvokeAsync("JoinOrderGroup", OrderId, CancellationToken.None);
+            Logger.LogInformation("注文 SignalR 接続確立: OrderId={OrderId}", OrderId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "注文 SignalR 接続失敗: ポーリングフォールバック開始 OrderId={OrderId}", OrderId);
+            await StartPollingFallbackAsync();
+        }
+    }
+
+    private async Task StartPollingFallbackAsync()
+    {
+        if (_isTerminal)
+        {
+            return;
+        }
+
+        _pollingCts = new CancellationTokenSource();
+        _pollingTimer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+
+        try
+        {
+            while (await _pollingTimer.WaitForNextTickAsync(_pollingCts.Token))
+            {
+                if (_isTerminal)
+                {
+                    break;
+                }
+
+                Logger.LogDebug("注文ステータスポーリング: OrderId={OrderId}", OrderId);
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.LogInformation("注文ステータスポーリング停止: OrderId={OrderId}", OrderId);
+        }
+    }
+
+    private async Task HandleStatusChangeAsync(OrderStatusEvent statusEvent)
+    {
+        _currentStatus = statusEvent.Status;
+        _statusMessage = statusEvent.Message;
+
+        Logger.LogInformation(
+            "注文ステータス変更: OrderId={OrderId}, Status={Status}, Message={Message}",
+            statusEvent.OrderId, statusEvent.Status, statusEvent.Message);
+
+        if (OnStatusChanged.HasDelegate)
+        {
+            await OnStatusChanged.InvokeAsync(statusEvent);
+        }
+
+        if (TerminalStatuses.Contains(statusEvent.Status.ToUpperInvariant()))
+        {
+            _isTerminal = true;
+            await StopMonitoringAsync();
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task StopMonitoringAsync()
+    {
+        _pollingCts?.Cancel();
+        _pollingTimer?.Dispose();
+        _pollingTimer = null;
+
+        if (_hubConnection is not null)
+        {
+            try
+            {
+                await _hubConnection.InvokeAsync("LeaveOrderGroup", OrderId, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "注文 SignalR グループ離脱時エラー: OrderId={OrderId}", OrderId);
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _pollingCts?.Cancel();
+        _pollingTimer?.Dispose();
+        _pollingCts?.Dispose();
+
+        if (_hubConnection is not null)
+        {
+            try
+            {
+                if (!_isTerminal)
+                {
+                    await _hubConnection.InvokeAsync("LeaveOrderGroup", OrderId, CancellationToken.None);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "注文 SignalR グループ離脱時エラー: OrderId={OrderId}", OrderId);
+            }
+
+            try
+            {
+                await _hubConnection.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "注文 SignalR 切断時エラー: OrderId={OrderId}", OrderId);
+            }
+        }
+    }
+}

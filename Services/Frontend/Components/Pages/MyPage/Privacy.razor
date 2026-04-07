@@ -1,0 +1,188 @@
+@page "/mypage/privacy"
+@rendermode @(RenderMode.InteractiveServer)
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject Frontend.Services.Interfaces.IApiGatewayClient ApiClient
+@inject ISnackbar Snackbar
+@inject ILogger<Frontend.Components.Pages.MyPage.Privacy> Logger
+
+<PageTitle>プライバシー設定 — Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack"
+               Href="/mypage" Class="mb-4">
+        マイページに戻る
+    </MudButton>
+
+    <MudPaper Elevation="4" Class="pa-8 rounded-lg">
+        <div class="text-center mb-6">
+            <MudIcon Icon="@Icons.Material.Filled.PrivacyTip" Color="Color.Primary" Size="Size.Large" />
+            <MudText Typo="Typo.h4" Class="mt-2" Style="font-weight: 700; color: #1565C0;">
+                プライバシー設定
+            </MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                お客様のデータの利用方法を管理できます。
+            </MudText>
+        </div>
+
+        @if (_isLoading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+        }
+        else
+        {
+            @foreach (var consent in _consents)
+            {
+                <MudPaper Elevation="0" Class="pa-4 mb-3" Style="background: #f5f5f5; border-radius: 8px;">
+                    <div class="d-flex align-center justify-space-between">
+                        <div style="flex: 1;">
+                            <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">
+                                @GetConsentLabel(consent.ConsentType)
+                            </MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                @GetConsentDescription(consent.ConsentType)
+                            </MudText>
+                        </div>
+                        <MudSwitch T="bool"
+                                   Value="consent.IsGranted"
+                                   ValueChanged="@(value => OnConsentChanged(consent.ConsentType, value))"
+                                   Color="Color.Primary" />
+                    </div>
+                </MudPaper>
+            }
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       Size="Size.Large"
+                       OnClick="HandleSaveAsync"
+                       Disabled="@_isSaving"
+                       Class="mt-4"
+                       Style="min-height: 48px;">
+                @if (_isSaving)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                変更を保存する
+            </MudButton>
+
+            <MudDivider Class="my-4" />
+
+            <MudButton Variant="Variant.Text" Color="Color.Primary"
+                       Href="/legal/privacy"
+                       StartIcon="@Icons.Material.Filled.Description">
+                プライバシーポリシーを確認する
+            </MudButton>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<ConsentItem> _consents = [];
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private string? _userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var profile = await ApiClient.GetAsync<UserProfileDto>("/api/v1/users/me");
+            _userId = profile?.Id;
+
+            if (_userId is not null)
+            {
+                var consents = await ApiClient.GetAsync<List<ConsentDto>>($"/api/v1/users/{_userId}/consents");
+                if (consents is not null)
+                {
+                    _consents = consents.Select(c => new ConsentItem(c.ConsentType, c.IsGranted)).ToList();
+                }
+                else
+                {
+                    _consents =
+                    [
+                        new("MARKETING", false),
+                        new("ANALYTICS", false),
+                        new("PERSONALIZATION", false),
+                        new("THIRD_PARTY", false)
+                    ];
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "プライバシー設定の読み込みに失敗: {Message}", ex.Message);
+            Snackbar.Add("設定の読み込みに失敗しました", Severity.Error);
+            _consents =
+            [
+                new("MARKETING", false),
+                new("ANALYTICS", false),
+                new("PERSONALIZATION", false),
+                new("THIRD_PARTY", false)
+            ];
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void OnConsentChanged(string consentType, bool value)
+    {
+        var item = _consents.FirstOrDefault(c => c.ConsentType == consentType);
+        if (item is not null)
+        {
+            var index = _consents.IndexOf(item);
+            _consents[index] = item with { IsGranted = value };
+        }
+    }
+
+    private async Task HandleSaveAsync()
+    {
+        if (_userId is null) return;
+        _isSaving = true;
+
+        try
+        {
+            var request = new UpdateConsentsRequest(
+                _consents.Select(c => new ConsentUpdateItem(c.ConsentType, c.IsGranted)).ToList());
+
+            await ApiClient.PutAsync<UpdateConsentsRequest, object>(
+                $"/api/v1/users/{_userId}/consents", request);
+
+            Snackbar.Add("プライバシー設定を保存しました", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "プライバシー設定の保存に失敗: {Message}", ex.Message);
+            Snackbar.Add("設定の保存に失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private static string GetConsentLabel(string consentType) => consentType switch
+    {
+        "MARKETING" => "マーケティング",
+        "ANALYTICS" => "アナリティクス",
+        "PERSONALIZATION" => "パーソナライゼーション",
+        "THIRD_PARTY" => "第三者提供",
+        _ => consentType
+    };
+
+    private static string GetConsentDescription(string consentType) => consentType switch
+    {
+        "MARKETING" => "プロモーションやセール情報をメール・通知でお届けします。",
+        "ANALYTICS" => "サービス改善のためにご利用状況の分析を行います。",
+        "PERSONALIZATION" => "閲覧履歴に基づくおすすめ商品の表示を行います。",
+        "THIRD_PARTY" => "信頼できるパートナー企業とのデータ共有を許可します。",
+        _ => string.Empty
+    };
+
+    private record UserProfileDto(string Id, string Email, string Name, string? PhoneNumber, string Role, DateTime CreatedAt);
+    private record ConsentDto(string ConsentType, bool IsGranted, string? Description, DateTime? UpdatedAt);
+    private record ConsentItem(string ConsentType, bool IsGranted);
+    private record UpdateConsentsRequest(List<ConsentUpdateItem> Consents);
+    private record ConsentUpdateItem(string ConsentType, bool IsGranted);
+}

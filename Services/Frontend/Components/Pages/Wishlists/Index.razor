@@ -1,0 +1,358 @@
+@page "/wishlists"
+@rendermode @(RenderMode.InteractiveServer)
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@inject IWishlistApiClient WishlistApi
+@inject ICartApiClient CartApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject ILogger<Index> Logger
+
+<PageTitle>ウィッシュリスト - Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4" />
+
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+        <MudText Typo="Typo.h4" Style="font-weight: 700;">
+            <MudIcon Icon="@Icons.Material.Filled.Favorite" Class="mr-2" /> ウィッシュリスト
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="OpenCreateDialogAsync"
+                   StartIcon="@Icons.Material.Filled.Add">
+            新規作成
+        </MudButton>
+    </MudStack>
+
+    @if (_isLoading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+    }
+    else if (_wishlists.Count == 0)
+    {
+        <MudPaper Elevation="2" Class="pa-8 text-center" Style="border-radius: 12px;">
+            <MudIcon Icon="@Icons.Material.Filled.FavoriteBorder" Size="Size.Large"
+                     Color="Color.Default" Class="mb-4" />
+            <MudText Typo="Typo.h6" Class="mb-2">ウィッシュリストがありません</MudText>
+            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+                「新規作成」ボタンからウィッシュリストを作成して、お気に入りの商品を保存しましょう。
+            </MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="OpenCreateDialogAsync"
+                       StartIcon="@Icons.Material.Filled.Add">
+                ウィッシュリストを作成
+            </MudButton>
+        </MudPaper>
+    }
+    else
+    {
+        @* ウィッシュリスト選択タブ *@
+        <MudTabs @bind-ActivePanelIndex="_activeWishlistIndex" Elevation="2" Rounded="true"
+                 ApplyEffectsToContainer="true" PanelClass="pa-4">
+            @foreach (var wishlist in _wishlists)
+            {
+                <MudTabPanel Text="@wishlist.Name" Icon="@Icons.Material.Filled.List">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+                        <div>
+                            <MudText Typo="Typo.h6" Style="font-weight: 600;">@wishlist.Name</MudText>
+                            @if (!string.IsNullOrWhiteSpace(wishlist.Description))
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">@wishlist.Description</MudText>
+                            }
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @wishlist.Items.Count 件のアイテム
+                            </MudText>
+                        </div>
+                        <MudStack Row="true" Spacing="1">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                           Color="Color.Primary" Size="Size.Small"
+                                           OnClick="@(() => OpenEditDialogAsync(wishlist))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Color="Color.Error" Size="Size.Small"
+                                           OnClick="@(() => DeleteWishlistAsync(wishlist))" />
+                        </MudStack>
+                    </MudStack>
+
+                    @if (wishlist.Items.Count == 0)
+                    {
+                        <MudPaper Elevation="0" Class="pa-8 text-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Inbox" Size="Size.Large"
+                                     Color="Color.Default" Class="mb-4" />
+                            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+                                ウィッシュリストに商品がありません
+                            </MudText>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/products"
+                                       StartIcon="@Icons.Material.Filled.Search">
+                                商品を探す
+                            </MudButton>
+                        </MudPaper>
+                    }
+                    else
+                    {
+                        <MudGrid>
+                            @foreach (var item in wishlist.Items)
+                            {
+                                <MudItem xs="12" sm="6" md="4">
+                                    <MudCard Elevation="2" Style="border-radius: 12px; height: 100%;">
+                                        @if (!string.IsNullOrWhiteSpace(item.ImageUrl))
+                                        {
+                                            <MudCardMedia Image="@item.ImageUrl" Height="180" />
+                                        }
+                                        <MudCardContent>
+                                            <MudLink Href="@($"/products/{item.ProductId}")"
+                                                     Color="Color.Inherit" Underline="Underline.Hover">
+                                                <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">
+                                                    @item.ProductName
+                                                </MudText>
+                                            </MudLink>
+                                            <MudStack Row="true" Justify="Justify.SpaceBetween"
+                                                      AlignItems="AlignItems.Center" Class="mt-2">
+                                                <MudText Typo="Typo.h6" Color="Color.Primary"
+                                                         Style="font-weight: 700;">
+                                                    ¥@item.Price.ToString("N0")
+                                                </MudText>
+                                                <StockBadge StockQuantity="@(item.InStock ? 99 : 0)" />
+                                            </MudStack>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                                                追加日: @item.AddedAt.ToString("yyyy/MM/dd")
+                                            </MudText>
+                                        </MudCardContent>
+                                        <MudCardActions>
+                                            <MudButton Variant="Variant.Filled"
+                                                       Color="Color.Primary"
+                                                       Size="Size.Small"
+                                                       Disabled="@(!item.InStock || _isAddingToCart)"
+                                                       OnClick="@(() => AddToCartAsync(item))"
+                                                       StartIcon="@Icons.Material.Filled.ShoppingCart">
+                                                カートに追加
+                                            </MudButton>
+                                            <MudSpacer />
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                           Color="Color.Error" Size="Size.Small"
+                                                           OnClick="@(() => RemoveItemAsync(wishlist, item))" />
+                                        </MudCardActions>
+                                    </MudCard>
+                                </MudItem>
+                            }
+                        </MudGrid>
+                    }
+                </MudTabPanel>
+            }
+        </MudTabs>
+    }
+</MudContainer>
+
+@* ウィッシュリスト作成/編集ダイアログ *@
+<MudDialog @bind-Visible="_showDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            @(_editingWishlist is null ? "ウィッシュリストを作成" : "ウィッシュリストを編集")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_dialogName" Label="名前" Required="true"
+                      RequiredError="名前は必須です" MaxLength="50" Class="mb-4"
+                      Immediate="true" />
+        <MudTextField @bind-Value="_dialogDescription" Label="説明（任意）"
+                      MaxLength="200" Lines="3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog" Color="Color.Default">キャンセル</MudButton>
+        <MudButton OnClick="SaveWishlistAsync" Color="Color.Primary" Variant="Variant.Filled"
+                   Disabled="@(string.IsNullOrWhiteSpace(_dialogName) || _isSaving)">
+            @(_editingWishlist is null ? "作成" : "保存")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<WishlistDto> _wishlists = [];
+    private int _activeWishlistIndex;
+    private bool _isLoading = true;
+    private bool _isAddingToCart;
+    private bool _isSaving;
+
+    // ダイアログ状態
+    private bool _showDialog;
+    private string _dialogName = string.Empty;
+    private string? _dialogDescription;
+    private WishlistDto? _editingWishlist;
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+        CloseOnEscapeKey = true
+    };
+
+    private readonly List<BreadcrumbItem> _breadcrumbs =
+    [
+        new("ホーム", href: "/"),
+        new("ウィッシュリスト", href: null, disabled: true)
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWishlistsAsync();
+    }
+
+    private async Task LoadWishlistsAsync(CancellationToken ct = default)
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            _wishlists = await WishlistApi.GetWishlistsAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "ウィッシュリストの取得に失敗しました");
+            Snackbar.Add("ウィッシュリストの読み込みに失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OpenCreateDialogAsync()
+    {
+        _editingWishlist = null;
+        _dialogName = string.Empty;
+        _dialogDescription = null;
+        _showDialog = true;
+    }
+
+    private void OpenEditDialogAsync(WishlistDto wishlist)
+    {
+        _editingWishlist = wishlist;
+        _dialogName = wishlist.Name;
+        _dialogDescription = wishlist.Description;
+        _showDialog = true;
+    }
+
+    private void CloseDialog()
+    {
+        _showDialog = false;
+        _editingWishlist = null;
+    }
+
+    private async Task SaveWishlistAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_dialogName)) return;
+
+        _isSaving = true;
+        StateHasChanged();
+
+        try
+        {
+            if (_editingWishlist is null)
+            {
+                var created = await WishlistApi.CreateWishlistAsync(
+                    new CreateWishlistRequest(_dialogName.Trim(), _dialogDescription?.Trim()));
+                if (created is not null)
+                {
+                    _wishlists.Add(created);
+                    _activeWishlistIndex = _wishlists.Count - 1;
+                    Snackbar.Add("ウィッシュリストを作成しました", Severity.Success);
+                }
+            }
+            else
+            {
+                var updated = await WishlistApi.UpdateWishlistAsync(
+                    _editingWishlist.Id,
+                    new UpdateWishlistRequest(_dialogName.Trim(), _dialogDescription?.Trim()));
+                if (updated is not null)
+                {
+                    var index = _wishlists.FindIndex(w => w.Id == _editingWishlist.Id);
+                    if (index >= 0)
+                    {
+                        _wishlists[index] = updated;
+                    }
+                    Snackbar.Add("ウィッシュリストを更新しました", Severity.Success);
+                }
+            }
+
+            CloseDialog();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "ウィッシュリストの保存に失敗しました");
+            Snackbar.Add("ウィッシュリストの保存に失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteWishlistAsync(WishlistDto wishlist)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "ウィッシュリストの削除",
+            $"「{wishlist.Name}」を削除しますか？この操作は元に戻せません。",
+            yesText: "削除", cancelText: "キャンセル");
+
+        if (confirmed != true) return;
+
+        try
+        {
+            await WishlistApi.DeleteWishlistAsync(wishlist.Id);
+            _wishlists.Remove(wishlist);
+            _activeWishlistIndex = Math.Max(0, _activeWishlistIndex - 1);
+            Snackbar.Add("ウィッシュリストを削除しました", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "ウィッシュリストの削除に失敗しました: WishlistId={WishlistId}", wishlist.Id);
+            Snackbar.Add("ウィッシュリストの削除に失敗しました", Severity.Error);
+        }
+    }
+
+    private async Task AddToCartAsync(WishlistItemDto item)
+    {
+        _isAddingToCart = true;
+        StateHasChanged();
+
+        try
+        {
+            await CartApi.AddItemAsync(new AddCartItemRequest(item.ProductId, 1));
+            Snackbar.Add($"「{item.ProductName}」をカートに追加しました", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "カートへの追加に失敗しました: ProductId={ProductId}", item.ProductId);
+            Snackbar.Add("カートへの追加に失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isAddingToCart = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RemoveItemAsync(WishlistDto wishlist, WishlistItemDto item)
+    {
+        try
+        {
+            await WishlistApi.RemoveItemFromWishlistAsync(wishlist.Id, item.Id);
+            var index = _wishlists.FindIndex(w => w.Id == wishlist.Id);
+            if (index >= 0)
+            {
+                var updatedItems = wishlist.Items.Where(i => i.Id != item.Id).ToList();
+                _wishlists[index] = wishlist with { Items = updatedItems };
+            }
+            Snackbar.Add("アイテムを削除しました", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "アイテムの削除に失敗しました: WishlistId={WishlistId}, ItemId={ItemId}",
+                wishlist.Id, item.Id);
+            Snackbar.Add("アイテムの削除に失敗しました", Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,154 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "管理ダッシュボード";
+    Layout = "/Pages/Admin/_Layout.cshtml";
+}
+
+<div class="container-fluid">
+    <h1 class="mb-4">SkiShop 管理ダッシュボード</h1>
+
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-warning" role="alert">@Model.ErrorMessage</div>
+    }
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-dark text-white">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-light opacity-75">本日の売上</h6>
+                    <h3 class="card-title mb-0">¥@Model.TodaySales.ToString("N0")</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-dark text-white">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-light opacity-75">本日の注文数</h6>
+                    <h3 class="card-title mb-0">@Model.TodayOrderCount 件</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h5 class="card-title">商品管理</h5>
+                    <p class="card-text">商品の登録・編集・削除</p>
+                    <a href="/Admin/Products" class="btn btn-light">管理画面へ</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h5 class="card-title">注文管理</h5>
+                    <p class="card-text">注文一覧・ステータス更新</p>
+                    <a href="/Admin/Orders" class="btn btn-light">管理画面へ</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h5 class="card-title">ユーザー管理</h5>
+                    <p class="card-text">ユーザー一覧・権限管理</p>
+                    <a href="/Admin/Users" class="btn btn-light">管理画面へ</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <h5 class="card-title">クーポン管理</h5>
+                    <p class="card-text">クーポンの発行・管理</p>
+                    <a href="/Admin/Coupons" class="btn btn-light">管理画面へ</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-secondary">
+                <div class="card-body">
+                    <h5 class="card-title">在庫管理</h5>
+                    <p class="card-text">在庫状況・入出庫管理</p>
+                    <a href="/Admin/Inventory" class="btn btn-light">管理画面へ</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-dark">
+                <div class="card-body">
+                    <h5 class="card-title">カテゴリ管理</h5>
+                    <p class="card-text">カテゴリの追加・編集</p>
+                    <a href="/Admin/Categories" class="btn btn-light">管理画面へ</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white" style="background-color:#6f42c1">
+                <div class="card-body">
+                    <h5 class="card-title">配送管理</h5>
+                    <p class="card-text">配送状況・追跡番号管理</p>
+                    <a href="/Admin/Shipments" class="btn btn-light">管理画面へ</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white" style="background-color:#e83e8c">
+                <div class="card-body">
+                    <h5 class="card-title">返品管理</h5>
+                    <p class="card-text">返品リクエスト・返金処理</p>
+                    <a href="/Admin/Returns" class="btn btn-light">管理画面へ</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white" style="background-color:#20c997">
+                <div class="card-body">
+                    <h5 class="card-title">ポイント管理</h5>
+                    <p class="card-text">ポイント付与・履歴確認</p>
+                    <a href="/Admin/Points" class="btn btn-light">管理画面へ</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white" style="background-color:#fd7e14">
+                <div class="card-body">
+                    <h5 class="card-title">メール管理</h5>
+                    <p class="card-text">メール送信履歴・テンプレート</p>
+                    <a href="/Admin/Mail" class="btn btn-light">管理画面へ</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white" style="background-color:#dc3545">
+                <div class="card-body">
+                    <h5 class="card-title">セキュリティログ</h5>
+                    <p class="card-text">セキュリティイベント履歴</p>
+                    <a href="/Admin/SecurityLogs" class="btn btn-light">管理画面へ</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white" style="background-color:#0dcaf0">
+                <div class="card-body">
+                    <h5 class="card-title">AI サポート</h5>
+                    <p class="card-text">AI チャットボット管理</p>
+                    <a href="/Admin/AiSupport" class="btn btn-light">管理画面へ</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white" style="background-color:#198754">
+                <div class="card-body">
+                    <h5 class="card-title">レポート</h5>
+                    <p class="card-text">売上・分析レポート</p>
+                    <a href="/Admin/Reports" class="btn btn-light">管理画面へ</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

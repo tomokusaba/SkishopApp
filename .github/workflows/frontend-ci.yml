@@ -1,0 +1,120 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'Services/frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'Services/frontend/**'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Services/frontend/package-lock.json
+      - run: npm ci
+        working-directory: Services/frontend
+      - run: npm run lint
+        working-directory: Services/frontend
+
+  type-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Services/frontend/package-lock.json
+      - run: npm ci
+        working-directory: Services/frontend
+      - run: npm run type-check
+        working-directory: Services/frontend
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Services/frontend/package-lock.json
+      - run: npm ci
+        working-directory: Services/frontend
+      - run: npm run test
+        working-directory: Services/frontend
+      - uses: codecov/codecov-action@v3
+        with:
+          files: ./Services/frontend/coverage/coverage-final.json
+          flags: frontend
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Services/frontend/package-lock.json
+      - run: npm ci
+        working-directory: Services/frontend
+      - run: npm run build
+        working-directory: Services/frontend
+      - run: npx playwright install --with-deps
+        working-directory: Services/frontend
+      - run: npm run e2e
+        working-directory: Services/frontend
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: playwright-report
+          path: Services/frontend/playwright-report/
+          retention-days: 30
+
+  bundle-size:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Services/frontend/package-lock.json
+      - run: npm ci
+        working-directory: Services/frontend
+      - run: npm run build
+        working-directory: Services/frontend
+      - run: npm run analyze-bundle
+        working-directory: Services/frontend
+      - run: npm run check-bundle-size
+        working-directory: Services/frontend
+
+  lighthouse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Services/frontend/package-lock.json
+      - run: npm ci
+        working-directory: Services/frontend
+      - run: npm run build
+        working-directory: Services/frontend
+      - run: npm install -g @lhci/cli@0.12.x
+      - run: npm run start:test &
+        working-directory: Services/frontend
+      - run: sleep 5 && lhci autorun --config ./lighthouserc.js
+        working-directory: Services/frontend

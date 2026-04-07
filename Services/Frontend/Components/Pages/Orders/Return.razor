@@ -1,0 +1,324 @@
+@page "/orders/{OrderId}/return"
+@rendermode @(RenderMode.InteractiveServer)
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@inject IOrderApiClient OrderApi
+@inject IShipmentReturnApiClient ShipmentReturnApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject ILogger<Return> Logger
+
+<PageTitle>返品申請 - Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
+    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4" />
+
+    @if (_isLoading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_order is null)
+    {
+        <MudAlert Severity="Severity.Error">注文が見つかりませんでした。</MudAlert>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/orders" Class="mt-4">
+            注文履歴に戻る
+        </MudButton>
+    }
+    else if (!_canReturn)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-4">
+            この注文は返品対象外です。返品は配達完了日から14日以内の商品に限ります。
+        </MudAlert>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@($"/orders/{OrderId}")" Class="mt-4">
+            注文詳細に戻る
+        </MudButton>
+    }
+    else
+    {
+        <MudText Typo="Typo.h4" Class="mb-2" Style="font-weight: 700;">
+            <MudIcon Icon="@Icons.Material.Filled.AssignmentReturn" Class="mr-2" />返品申請
+        </MudText>
+        <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-6">
+            注文番号: @_order.OrderNumber
+        </MudText>
+
+        @* Product Selection *@
+        <MudPaper Elevation="2" Class="pa-4 mb-4" Style="border-radius: 12px;">
+            <MudText Typo="Typo.h6" Class="mb-4">返品する商品を選択</MudText>
+
+            @if (_validationError is not null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">@_validationError</MudAlert>
+            }
+
+            @foreach (var item in _returnItems)
+            {
+                <MudPaper Elevation="0" Class="pa-4 mb-3" Style="border: 1px solid #e0e0e0; border-radius: 8px;">
+                    <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="3">
+                        <MudCheckBox T="bool" @bind-Value="item.IsSelected" Color="Color.Primary" />
+                        <MudStack Spacing="2" Style="flex: 1;">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">
+                                    @item.ProductName
+                                </MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    購入数量: @item.OriginalQuantity
+                                </MudText>
+                            </MudStack>
+
+                            @if (item.IsSelected)
+                            {
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12" sm="4">
+                                        <MudNumericField T="int" @bind-Value="item.ReturnQuantity"
+                                                         Label="返品数量"
+                                                         Variant="Variant.Outlined"
+                                                         Min="1" Max="@item.OriginalQuantity"
+                                                         Margin="Margin.Dense" />
+                                    </MudItem>
+                                    <MudItem xs="12" sm="8">
+                                        <MudSelect T="string" @bind-Value="item.Reason"
+                                                   Label="返品理由"
+                                                   Variant="Variant.Outlined"
+                                                   Margin="Margin.Dense"
+                                                   Required="true"
+                                                   RequiredError="返品理由を選択してください">
+                                            @foreach (var reason in ReturnReasons)
+                                            {
+                                                <MudSelectItem T="string" Value="@reason">@reason</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    </MudItem>
+                                </MudGrid>
+                            }
+                        </MudStack>
+                    </MudStack>
+                </MudPaper>
+            }
+        </MudPaper>
+
+        @* Description *@
+        <MudPaper Elevation="2" Class="pa-4 mb-4" Style="border-radius: 12px;">
+            <MudText Typo="Typo.h6" Class="mb-3">補足説明（任意）</MudText>
+            <MudTextField T="string" @bind-Value="_description"
+                          Lines="4"
+                          Variant="Variant.Outlined"
+                          Placeholder="返品に関する補足情報があれば入力してください"
+                          Counter="500"
+                          MaxLength="500" />
+        </MudPaper>
+
+        @* Return Policy *@
+        <MudPaper Elevation="0" Class="pa-4 mb-6" Style="border-radius: 12px; background-color: #f5f5f5;">
+            <MudText Typo="Typo.subtitle2" Class="mb-2" Style="font-weight: 600;">
+                <MudIcon Icon="@Icons.Material.Filled.Policy" Size="Size.Small" Class="mr-1" />返品ポリシー
+            </MudText>
+            <MudList T="string" Dense="true">
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Check" IconSize="Size.Small" IconColor="Color.Success">
+                    配達完了日から14日以内の商品が返品対象です
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Check" IconSize="Size.Small" IconColor="Color.Success">
+                    返品申請後、審査を経て承認されます
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Check" IconSize="Size.Small" IconColor="Color.Success">
+                    承認後、返品商品の発送手順をメールでご案内します
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Check" IconSize="Size.Small" IconColor="Color.Success">
+                    返品商品の到着確認後、返金処理を行います
+                </MudListItem>
+            </MudList>
+        </MudPaper>
+
+        @* Actions *@
+        <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
+            <MudButton Variant="Variant.Text" Color="Color.Default"
+                       Href="@($"/orders/{OrderId}")">
+                キャンセル
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="OpenConfirmDialogAsync"
+                       Disabled="_isSubmitting"
+                       StartIcon="@Icons.Material.Filled.Send">
+                返品を申請する
+            </MudButton>
+        </MudStack>
+    }
+</MudContainer>
+
+@code {
+    [Parameter] public string OrderId { get; set; } = string.Empty;
+
+    private OrderDto? _order;
+    private ShipmentDto? _shipment;
+    private bool _isLoading = true;
+    private bool _isSubmitting;
+    private bool _canReturn;
+    private string? _description;
+    private string? _validationError;
+    private List<ReturnItemModel> _returnItems = [];
+
+    private static readonly string[] ReturnReasons =
+    [
+        "サイズが合わない",
+        "イメージと違う",
+        "商品に欠陥がある",
+        "注文間違い",
+        "その他"
+    ];
+
+    private List<BreadcrumbItem> _breadcrumbs = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _breadcrumbs =
+        [
+            new("ホーム", href: "/"),
+            new("注文履歴", href: "/orders"),
+            new("注文詳細", href: $"/orders/{OrderId}"),
+            new("返品申請", href: null, disabled: true)
+        ];
+
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+
+        try
+        {
+            var orderTask = OrderApi.GetOrderAsync(OrderId);
+            var shipmentTask = ShipmentReturnApi.GetShipmentByOrderAsync(OrderId);
+
+            await Task.WhenAll(orderTask, shipmentTask);
+
+            _order = await orderTask;
+            _shipment = await shipmentTask;
+
+            if (_order is not null)
+            {
+                _canReturn = CheckCanReturn();
+                _returnItems = _order.Items.Select(item => new ReturnItemModel
+                {
+                    OrderItemId = item.ProductId,
+                    ProductName = item.ProductName,
+                    OriginalQuantity = item.Quantity,
+                    ReturnQuantity = item.Quantity,
+                    Reason = ReturnReasons[0]
+                }).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "返品申請ページの読み込みに失敗しました: OrderId={OrderId}", OrderId);
+            Snackbar.Add("データの読み込みに失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private bool CheckCanReturn()
+    {
+        if (_order is null) return false;
+        if (_order.Status.ToUpperInvariant() != "DELIVERED") return false;
+
+        var deliveredEvent = _shipment?.Events
+            .FirstOrDefault(e => e.Status.ToUpperInvariant() == "DELIVERED");
+        if (deliveredEvent is null) return false;
+
+        return (DateTime.UtcNow - deliveredEvent.OccurredAt).TotalDays <= 14;
+    }
+
+    private bool Validate()
+    {
+        var selectedItems = _returnItems.Where(i => i.IsSelected).ToList();
+
+        if (selectedItems.Count == 0)
+        {
+            _validationError = "返品する商品を少なくとも1つ選択してください";
+            return false;
+        }
+
+        foreach (var item in selectedItems)
+        {
+            if (item.ReturnQuantity < 1 || item.ReturnQuantity > item.OriginalQuantity)
+            {
+                _validationError = $"「{item.ProductName}」の返品数量が不正です（1〜{item.OriginalQuantity}）";
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(item.Reason))
+            {
+                _validationError = $"「{item.ProductName}」の返品理由を選択してください";
+                return false;
+            }
+        }
+
+        _validationError = null;
+        return true;
+    }
+
+    private async Task OpenConfirmDialogAsync()
+    {
+        if (!Validate()) return;
+
+        var selectedItems = _returnItems.Where(i => i.IsSelected).ToList();
+
+        var confirmed = await DialogService.ShowMessageBox(
+            "返品申請の確認",
+            $"{selectedItems.Count} 件の商品を返品申請します。よろしいですか？",
+            yesText: "申請する",
+            cancelText: "戻る",
+            options: new DialogOptions { MaxWidth = MaxWidth.Small });
+
+        if (confirmed == true)
+        {
+            await SubmitReturnAsync();
+        }
+    }
+
+    private async Task SubmitReturnAsync()
+    {
+        _isSubmitting = true;
+        StateHasChanged();
+
+        try
+        {
+            var selectedItems = _returnItems.Where(i => i.IsSelected).ToList();
+
+            var request = new CreateReturnRequest(
+                OrderId,
+                selectedItems.Select(i => new CreateReturnItemRequest(
+                    i.OrderItemId, i.ReturnQuantity, i.Reason!)).ToList(),
+                string.IsNullOrWhiteSpace(_description) ? null : _description.Trim());
+
+            await ShipmentReturnApi.CreateReturnRequestAsync(request);
+
+            Snackbar.Add("返品申請を受け付けました", Severity.Success);
+            Navigation.NavigateTo($"/orders/{OrderId}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "返品申請に失敗しました: OrderId={OrderId}", OrderId);
+            Snackbar.Add("返品申請中にエラーが発生しました", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private sealed class ReturnItemModel
+    {
+        public string OrderItemId { get; init; } = string.Empty;
+        public string ProductName { get; init; } = string.Empty;
+        public int OriginalQuantity { get; init; }
+        public bool IsSelected { get; set; }
+        public int ReturnQuantity { get; set; } = 1;
+        public string? Reason { get; set; }
+    }
+}

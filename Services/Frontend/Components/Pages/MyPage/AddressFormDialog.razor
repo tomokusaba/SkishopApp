@@ -1,0 +1,93 @@
+@namespace Frontend.Components.Pages.MyPage
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isFormValid">
+            <MudTextField @bind-Value="Model.Label"
+                          Label="ラベル"
+                          Required="true"
+                          RequiredError="ラベルは必須です"
+                          Placeholder="自宅、会社など"
+                          Variant="Variant.Outlined"
+                          Class="mb-3" />
+
+            <MudTextField @bind-Value="Model.PostalCode"
+                          Label="郵便番号"
+                          Required="true"
+                          RequiredError="郵便番号は必須です"
+                          Placeholder="123-4567"
+                          Variant="Variant.Outlined"
+                          Class="mb-3"
+                          MaxLength="8" />
+
+            <MudTextField @bind-Value="Model.Prefecture"
+                          Label="都道府県"
+                          Required="true"
+                          RequiredError="都道府県は必須です"
+                          Variant="Variant.Outlined"
+                          Class="mb-3" />
+
+            <MudTextField @bind-Value="Model.City"
+                          Label="市区町村"
+                          Required="true"
+                          RequiredError="市区町村は必須です"
+                          Variant="Variant.Outlined"
+                          Class="mb-3" />
+
+            <MudTextField @bind-Value="Model.AddressLine1"
+                          Label="番地"
+                          Required="true"
+                          RequiredError="番地は必須です"
+                          Variant="Variant.Outlined"
+                          Class="mb-3" />
+
+            <MudTextField @bind-Value="Model.AddressLine2"
+                          Label="建物名・部屋番号"
+                          Variant="Variant.Outlined"
+                          Class="mb-3" />
+
+            <MudTextField @bind-Value="Model.PhoneNumber"
+                          Label="電話番号"
+                          Variant="Variant.Outlined"
+                          Class="mb-3"
+                          Placeholder="090-1234-5678" />
+
+            <MudSwitch @bind-Value="Model.IsDefault"
+                       Label="デフォルトの配送先に設定する"
+                       Color="Color.Primary"
+                       Class="mb-2" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">キャンセル</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="Submit" Disabled="@(!_isFormValid)">
+            保存する
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public string DialogTitle { get; set; } = "住所";
+
+    [Parameter]
+    public Addresses.AddressFormModel Model { get; set; } = new();
+
+    private MudForm? _form;
+    private bool _isFormValid;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        if (_form is not null) await _form.Validate();
+        if (_isFormValid)
+        {
+            MudDialog.Close(DialogResult.Ok(Model));
+        }
+    }
+}

@@ -1,0 +1,252 @@
+@page "/mypage/security/mfa"
+@rendermode @(RenderMode.InteractiveServer)
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject IAuthApiClient AuthApi
+@inject ISnackbar Snackbar
+@inject IJSRuntime JsRuntime
+
+<PageTitle>MFA セットアップ — Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
+    <MudPaper Elevation="4" Class="pa-8 rounded-lg">
+        <div class="text-center mb-6">
+            <MudIcon Icon="@Icons.Material.Filled.Security" Color="Color.Primary" Size="Size.Large" />
+            <MudText Typo="Typo.h4" Class="mt-2" Style="font-weight: 700; color: #1565C0;">
+                二段階認証（MFA）設定
+            </MudText>
+        </div>
+
+        @switch (_currentStep)
+        {
+            case MfaStep.Initial:
+                <MudAlert Severity="Severity.Info" Class="mb-4">
+                    二段階認証を有効にすると、ログイン時にパスワードに加えて認証アプリのコードが必要になります。
+                </MudAlert>
+
+                <MudTextField @bind-Value="_password"
+                              Label="現在のパスワードを入力"
+                              InputType="InputType.Password"
+                              Required="true"
+                              Variant="Variant.Outlined"
+                              Class="mb-4"
+                              autocomplete="current-password" />
+
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <MudAlert Severity="Severity.Error" Class="mb-4" role="alert">@_errorMessage</MudAlert>
+                }
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           OnClick="HandleSetupStartAsync"
+                           Disabled="@_isLoading"
+                           Style="min-height: 48px;">
+                    MFA を設定する
+                </MudButton>
+                break;
+
+            case MfaStep.QrCode:
+                <MudText Typo="Typo.h6" Class="mb-4">認証アプリの設定</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                    Google Authenticator や Microsoft Authenticator で以下の QR コードをスキャンしてください。
+                </MudText>
+
+                <div class="text-center mb-4">
+                    @if (!string.IsNullOrEmpty(_qrCodeUrl))
+                    {
+                        <MudImage Src="@_qrCodeUrl" Alt="MFA セットアップ用 QR コード" Width="200" Height="200"
+                                  Class="mx-auto" />
+                    }
+                </div>
+
+                <MudExpansionPanels Class="mb-4">
+                    <MudExpansionPanel Text="QR コードをスキャンできない場合">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                            以下のシークレットキーを認証アプリに手動入力してください:
+                        </MudText>
+                        <MudTextField Value="@_secretKey"
+                                      ReadOnly="true"
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.End"
+                                      AdornmentIcon="@Icons.Material.Filled.ContentCopy"
+                                      OnAdornmentClick="CopySecretKeyAsync" />
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+
+                <MudTextField @bind-Value="_verificationCode"
+                              Label="認証コード（6桁）"
+                              MaxLength="6"
+                              Variant="Variant.Outlined"
+                              Class="mb-4"
+                              autocomplete="one-time-code" />
+
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <MudAlert Severity="Severity.Error" Class="mb-4" role="alert">@_errorMessage</MudAlert>
+                }
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           OnClick="HandleVerifyAsync"
+                           Disabled="@_isLoading"
+                           Style="min-height: 48px;">
+                    認証コードを検証
+                </MudButton>
+                break;
+
+            case MfaStep.BackupCodes:
+                <MudAlert Severity="Severity.Warning" Class="mb-4" role="alert">
+                    バックアップコードを安全な場所に保存してください。このコードは一度だけ表示されます。
+                </MudAlert>
+
+                <MudText Typo="Typo.h6" Class="mb-4">バックアップコード</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                    認証アプリにアクセスできなくなった場合に使用できます。各コードは 1 回のみ使用可能です。
+                </MudText>
+
+                <MudPaper Elevation="0" Class="pa-4 mb-4" Style="background: #f5f5f5; border-radius: 8px;">
+                    <MudGrid>
+                        @foreach (var backupCode in _backupCodes)
+                        {
+                            <MudItem xs="6">
+                                <MudText Typo="Typo.body1" Style="font-family: monospace; font-size: 1.1rem;">
+                                    @backupCode
+                                </MudText>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </MudPaper>
+
+                <div class="d-flex gap-2 mb-4">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.ContentCopy"
+                               OnClick="CopyBackupCodesAsync"
+                               Style="min-height: 44px;">
+                        コピー
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Download"
+                               OnClick="DownloadBackupCodesAsync"
+                               Style="min-height: 44px;">
+                        テキストファイルでダウンロード
+                    </MudButton>
+                </div>
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Success"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           Href="/mypage"
+                           Style="min-height: 48px;">
+                    完了
+                </MudButton>
+                break;
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private MfaStep _currentStep = MfaStep.Initial;
+    private string _password = string.Empty;
+    private string? _qrCodeUrl;
+    private string? _secretKey;
+    private string _verificationCode = string.Empty;
+    private List<string> _backupCodes = [];
+    private bool _isLoading;
+    private string? _errorMessage;
+
+    private async Task HandleSetupStartAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_password)) return;
+
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var response = await AuthApi.SetupMfaAsync(_password);
+            _qrCodeUrl = response.QrCodeUrl;
+            _secretKey = response.SecretKey;
+            _backupCodes = response.BackupCodes;
+            _currentStep = MfaStep.QrCode;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _errorMessage = "パスワードが正しくありません";
+        }
+        catch (Exception)
+        {
+            _errorMessage = "MFA セットアップに失敗しました";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleVerifyAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_verificationCode)) return;
+
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            await AuthApi.VerifyMfaAsync(string.Empty, _verificationCode);
+            _currentStep = MfaStep.BackupCodes;
+            Snackbar.Add("二段階認証が有効になりました", Severity.Success);
+        }
+        catch (Exception)
+        {
+            _errorMessage = "認証コードが正しくありません。認証アプリに表示されているコードを再確認してください";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CopySecretKeyAsync()
+    {
+        if (_secretKey is null) return;
+        await JsRuntime.InvokeVoidAsync("navigator.clipboard.writeText", _secretKey);
+        Snackbar.Add("シークレットキーをコピーしました", Severity.Info);
+    }
+
+    private async Task CopyBackupCodesAsync()
+    {
+        var text = string.Join("\n", _backupCodes);
+        await JsRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
+        Snackbar.Add("バックアップコードをコピーしました", Severity.Info);
+    }
+
+    private async Task DownloadBackupCodesAsync()
+    {
+        var text = "Azure SkiShop MFA バックアップコード\n" +
+                   "====================================\n\n" +
+                   string.Join("\n", _backupCodes) +
+                   "\n\n各コードは 1 回のみ使用可能です。安全な場所に保管してください。";
+
+        await JsRuntime.InvokeVoidAsync("eval",
+            $"const blob = new Blob([`{text}`], {{type: 'text/plain'}}); " +
+            "const url = URL.createObjectURL(blob); " +
+            "const a = document.createElement('a'); " +
+            "a.href = url; a.download = 'skishop-mfa-backup-codes.txt'; " +
+            "document.body.appendChild(a); a.click(); " +
+            "document.body.removeChild(a); URL.revokeObjectURL(url);");
+    }
+
+    private enum MfaStep
+    {
+        Initial,
+        QrCode,
+        BackupCodes
+    }
+}

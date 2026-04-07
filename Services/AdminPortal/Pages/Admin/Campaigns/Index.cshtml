@@ -1,0 +1,229 @@
+@page
+@model AdminPortal.Pages.Admin.Campaigns.IndexModel
+@{
+    ViewData["Title"] = "キャンペーン管理";
+    Layout = "/Pages/Admin/_Layout.cshtml";
+}
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="bi bi-megaphone"></i> キャンペーン管理</h1>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createModal">
+            <i class="bi bi-plus-circle"></i> 新規作成
+        </button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            @Model.StatusMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">ステータスフィルタ</label>
+                    <select name="StatusFilter" class="form-select" onchange="this.form.submit()">
+                        <option value="all" selected="@(Model.StatusFilter == "all")">すべて</option>
+                        <option value="draft" selected="@(Model.StatusFilter == "draft")">下書き</option>
+                        <option value="active" selected="@(Model.StatusFilter == "active")">実施中</option>
+                        <option value="scheduled" selected="@(Model.StatusFilter == "scheduled")">予定</option>
+                        <option value="ended" selected="@(Model.StatusFilter == "ended")">終了</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>キャンペーン名</th>
+                            <th>説明</th>
+                            <th>ステータス</th>
+                            <th>開始日</th>
+                            <th>終了日</th>
+                            <th>割引率</th>
+                            <th>対象カテゴリ</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Campaigns.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">キャンペーンが見つかりません。</td>
+                            </tr>
+                        }
+                        @foreach (var campaign in Model.Campaigns)
+                        {
+                            <tr>
+                                <td><strong>@campaign.Name</strong></td>
+                                <td>@campaign.Description</td>
+                                <td>
+                                    @{
+                                        var statusClass = campaign.Status switch
+                                        {
+                                            "active" => "success",
+                                            "scheduled" => "info",
+                                            "draft" => "secondary",
+                                            "ended" => "dark",
+                                            _ => "light"
+                                        };
+                                        var statusLabel = campaign.Status switch
+                                        {
+                                            "active" => "実施中",
+                                            "scheduled" => "予定",
+                                            "draft" => "下書き",
+                                            "ended" => "終了",
+                                            _ => campaign.Status
+                                        };
+                                    }
+                                    <span class="badge bg-@statusClass">@statusLabel</span>
+                                </td>
+                                <td>@campaign.StartDate.ToString("yyyy/MM/dd")</td>
+                                <td>@campaign.EndDate.ToString("yyyy/MM/dd")</td>
+                                <td>@(campaign.DiscountRate.HasValue ? $"{campaign.DiscountRate.Value:P0}" : "—")</td>
+                                <td>@(campaign.TargetCategory ?? "全カテゴリ")</td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-outline-primary"
+                                            data-bs-toggle="modal" data-bs-target="#editModal-@campaign.Id">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                </td>
+                            </tr>
+
+                            <div class="modal fade" id="editModal-@campaign.Id" tabindex="-1"
+                                 aria-labelledby="editModalLabel-@campaign.Id" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form method="post" asp-page-handler="Update">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="campaignId" value="@campaign.Id" />
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="editModalLabel-@campaign.Id">キャンペーン編集</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="mb-3">
+                                                    <label class="form-label">キャンペーン名</label>
+                                                    <input type="text" class="form-control" name="CampaignForm.Name"
+                                                           value="@campaign.Name" required maxlength="100" />
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">説明</label>
+                                                    <textarea class="form-control" name="CampaignForm.Description"
+                                                              rows="3" maxlength="500">@campaign.Description</textarea>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">開始日</label>
+                                                    <input type="date" class="form-control" name="CampaignForm.StartDate"
+                                                           value="@campaign.StartDate.ToString("yyyy-MM-dd")" required />
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">終了日</label>
+                                                    <input type="date" class="form-control" name="CampaignForm.EndDate"
+                                                           value="@campaign.EndDate.ToString("yyyy-MM-dd")" required />
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">割引率</label>
+                                                    <input type="number" class="form-control" name="CampaignForm.DiscountRate"
+                                                           value="@campaign.DiscountRate" step="0.01" min="0" max="1" />
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">対象カテゴリ</label>
+                                                    <input type="text" class="form-control" name="CampaignForm.TargetCategory"
+                                                           value="@campaign.TargetCategory" maxlength="50" />
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                                                <button type="submit" class="btn btn-primary">更新</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (Model.TotalPages > 1)
+            {
+                <nav aria-label="ページナビゲーション">
+                    <ul class="pagination justify-content-center">
+                        <li class="page-item @(Model.CurrentPage <= 1 ? "disabled" : "")">
+                            <a class="page-link" asp-page="/Admin/Campaigns/Index"
+                               asp-route-currentPage="@(Model.CurrentPage - 1)"
+                               asp-route-statusFilter="@Model.StatusFilter">前へ</a>
+                        </li>
+                        @for (var i = 1; i <= Model.TotalPages; i++)
+                        {
+                            <li class="page-item @(i == Model.CurrentPage ? "active" : "")">
+                                <a class="page-link" asp-page="/Admin/Campaigns/Index"
+                                   asp-route-currentPage="@i"
+                                   asp-route-statusFilter="@Model.StatusFilter">@i</a>
+                            </li>
+                        }
+                        <li class="page-item @(Model.CurrentPage >= Model.TotalPages ? "disabled" : "")">
+                            <a class="page-link" asp-page="/Admin/Campaigns/Index"
+                               asp-route-currentPage="@(Model.CurrentPage + 1)"
+                               asp-route-statusFilter="@Model.StatusFilter">次へ</a>
+                        </li>
+                    </ul>
+                </nav>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="createModal" tabindex="-1" aria-labelledby="createModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" asp-page-handler="Create">
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createModalLabel">新規キャンペーン作成</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">キャンペーン名</label>
+                        <input type="text" class="form-control" asp-for="CampaignForm.Name" required maxlength="100" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">説明</label>
+                        <textarea class="form-control" asp-for="CampaignForm.Description" rows="3" maxlength="500"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">開始日</label>
+                        <input type="date" class="form-control" asp-for="CampaignForm.StartDate" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">終了日</label>
+                        <input type="date" class="form-control" asp-for="CampaignForm.EndDate" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">割引率（0〜1）</label>
+                        <input type="number" class="form-control" asp-for="CampaignForm.DiscountRate" step="0.01" min="0" max="1" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">対象カテゴリ（空欄＝全カテゴリ）</label>
+                        <input type="text" class="form-control" asp-for="CampaignForm.TargetCategory" maxlength="50" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">作成</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

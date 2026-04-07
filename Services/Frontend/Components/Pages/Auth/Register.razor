@@ -1,0 +1,204 @@
+@page "/auth/register"
+@rendermode @(RenderMode.InteractiveServer)
+@using System.ComponentModel.DataAnnotations
+@inject IAuthApiClient AuthApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject ILogger<Register> Logger
+
+<PageTitle>新規登録 — Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
+    <MudPaper Elevation="4" Class="pa-8 rounded-lg">
+        <div class="text-center mb-6">
+            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Color="Color.Primary" Size="Size.Large" />
+            <MudText Typo="Typo.h4" Class="mt-2" Style="font-weight: 700; color: #1565C0;">新規登録</MudText>
+        </div>
+
+        <EditForm Model="_model" OnValidSubmit="HandleRegisterAsync" FormName="RegisterForm">
+            <DataAnnotationsValidator />
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4" role="alert">@_errorMessage</MudAlert>
+            }
+
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_model.LastName"
+                                  Label="姓"
+                                  Required="true"
+                                  RequiredError="姓は必須です"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_model.FirstName"
+                                  Label="名"
+                                  Required="true"
+                                  RequiredError="名は必須です"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+            </MudGrid>
+
+            <MudTextField @bind-Value="_model.Email"
+                          Label="メールアドレス"
+                          InputType="InputType.Email"
+                          Required="true"
+                          RequiredError="メールアドレスは必須です"
+                          Variant="Variant.Outlined"
+                          Class="mt-4"
+                          autocomplete="email" />
+
+            <MudTextField @bind-Value="_model.Password"
+                          Label="パスワード"
+                          InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                          Required="true"
+                          RequiredError="パスワードは必須です"
+                          Variant="Variant.Outlined"
+                          Class="mt-4"
+                          autocomplete="new-password"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                          OnAdornmentClick="() => _showPassword = !_showPassword"
+                          HelperText="8 文字以上、大文字・小文字・数字・記号を含む" />
+
+            @{
+                var strength = CalculatePasswordStrength(_model.Password);
+            }
+            <MudProgressLinear Color="@GetStrengthColor(strength)" Value="@strength" Class="mt-1 mb-1" />
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                パスワード強度: @GetStrengthLabel(strength)
+            </MudText>
+
+            <MudTextField @bind-Value="_model.PasswordConfirm"
+                          Label="パスワード（確認）"
+                          InputType="InputType.Password"
+                          Required="true"
+                          RequiredError="パスワード確認は必須です"
+                          Variant="Variant.Outlined"
+                          Class="mt-4"
+                          autocomplete="new-password" />
+
+            <MudCheckBox @bind-Value="_model.AgreeToTerms"
+                         Color="Color.Primary"
+                         Class="mt-4"
+                         Required="true"
+                         RequiredError="利用規約への同意が必要です">
+                <MudLink Href="/legal/terms" Target="_blank">利用規約</MudLink>に同意する
+            </MudCheckBox>
+
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       Size="Size.Large"
+                       Disabled="@(_isLoading || !_model.AgreeToTerms)"
+                       Class="mt-4"
+                       Style="min-height: 48px;">
+                @if (_isLoading)
+                {
+                    <MudProgressCircular Color="Color.Inherit" Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                アカウントを作成
+            </MudButton>
+
+            <div class="text-center mt-4">
+                <MudText Typo="Typo.body2">
+                    既にアカウントをお持ちの方は
+                    <MudLink Href="/auth/login">ログイン</MudLink>
+                </MudText>
+            </div>
+        </EditForm>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private readonly RegisterModel _model = new();
+    private bool _showPassword;
+    private bool _isLoading;
+    private string? _errorMessage;
+
+    private async Task HandleRegisterAsync()
+    {
+        if (_model.Password != _model.PasswordConfirm)
+        {
+            _errorMessage = "パスワードが一致しません";
+            return;
+        }
+
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var username = $"{_model.LastName}_{_model.FirstName}".ToLowerInvariant();
+            await AuthApi.RegisterAsync(new Frontend.DTOs.RegisterRequest(
+                _model.Email, _model.Password, _model.FirstName, _model.LastName, username));
+
+            Navigation.NavigateTo($"/auth/email/pending?email={Uri.EscapeDataString(_model.Email)}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "ユーザー登録処理中にエラーが発生: {Message}", ex.Message);
+            _errorMessage = ex.Message.Contains("重複") || ex.Message.Contains("duplicate")
+                ? "このメールアドレスは既に登録されています"
+                : "登録中にエラーが発生しました。しばらく経ってからお試しください";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private static int CalculatePasswordStrength(string? password)
+    {
+        if (string.IsNullOrEmpty(password)) return 0;
+        int score = 0;
+        if (password.Length >= 8) score += 25;
+        if (password.Any(char.IsUpper)) score += 25;
+        if (password.Any(char.IsDigit)) score += 25;
+        if (password.Any(c => !char.IsLetterOrDigit(c))) score += 25;
+        return score;
+    }
+
+    private static Color GetStrengthColor(int strength) => strength switch
+    {
+        >= 100 => Color.Success,
+        >= 75 => Color.Info,
+        >= 50 => Color.Warning,
+        _ => Color.Error
+    };
+
+    private static string GetStrengthLabel(int strength) => strength switch
+    {
+        >= 100 => "強い",
+        >= 75 => "まずまず",
+        >= 50 => "弱い",
+        _ => "非常に弱い"
+    };
+
+    private sealed class RegisterModel
+    {
+        [Required(ErrorMessage = "メールアドレスは必須です")]
+        [EmailAddress(ErrorMessage = "有効なメールアドレスを入力してください")]
+        [StringLength(255)]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "パスワードは必須です")]
+        [StringLength(100, MinimumLength = 8, ErrorMessage = "パスワードは 8 文字以上で入力してください")]
+        public string Password { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "パスワード確認は必須です")]
+        public string PasswordConfirm { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "名は必須です")]
+        [StringLength(100)]
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "姓は必須です")]
+        [StringLength(100)]
+        public string LastName { get; set; } = string.Empty;
+
+        public bool AgreeToTerms { get; set; }
+    }
+}

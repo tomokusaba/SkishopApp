@@ -1,0 +1,39 @@
+@page "/legal/tokushoho"
+
+<PageTitle>特定商取引法に基づく表記 - Azure SkiShop</PageTitle>
+
+<HeadContent>
+    <meta name="description" content="Azure SkiShop の特定商取引法に基づく表記ページです。" />
+</HeadContent>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
+    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4" />
+
+    <MudPaper Elevation="2" Class="pa-6" Style="border-radius: 12px;">
+        <MudText Typo="Typo.h4" Class="mb-6" Style="font-weight: 700;">特定商取引法に基づく表記</MudText>
+
+        <MudSimpleTable Elevation="0" Dense="true" Style="border: 1px solid #e0e0e0; border-radius: 8px;">
+            <tbody>
+                <tr><td style="font-weight: 600; width: 200px; background: #f5f5f5;">販売業者</td><td>株式会社 Azure SkiShop</td></tr>
+                <tr><td style="font-weight: 600; background: #f5f5f5;">運営統括責任者</td><td>寺田 佳央</td></tr>
+                <tr><td style="font-weight: 600; background: #f5f5f5;">所在地</td><td>〒108-0075 東京都港区港南 2-16-3</td></tr>
+                <tr><td style="font-weight: 600; background: #f5f5f5;">電話番号</td><td>03-XXXX-XXXX（お問い合わせはメールにてお願いいたします）</td></tr>
+                <tr><td style="font-weight: 600; background: #f5f5f5;">メールアドレス</td><td>support&#64;azure-skishop.example.com</td></tr>
+                <tr><td style="font-weight: 600; background: #f5f5f5;">商品代金以外の費用</td><td>送料（全国一律 550 円、税込 8,800 円以上ご購入で送料無料）</td></tr>
+                <tr><td style="font-weight: 600; background: #f5f5f5;">お支払い方法</td><td>クレジットカード（Visa, Mastercard, JCB, AMEX）</td></tr>
+                <tr><td style="font-weight: 600; background: #f5f5f5;">お支払い時期</td><td>ご注文確定時にクレジットカード決済</td></tr>
+                <tr><td style="font-weight: 600; background: #f5f5f5;">商品の引渡し時期</td><td>ご注文確認後 3 〜 7 営業日以内に発送</td></tr>
+                <tr><td style="font-weight: 600; background: #f5f5f5;">返品・交換</td><td>商品到着後 14 日以内にご連絡ください。未使用品に限り返品・交換を承ります。</td></tr>
+                <tr><td style="font-weight: 600; background: #f5f5f5;">返品送料</td><td>お客様都合の場合はお客様負担。不良品の場合は当社負担。</td></tr>
+            </tbody>
+        </MudSimpleTable>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private readonly List<BreadcrumbItem> _breadcrumbs =
+    [
+        new("ホーム", href: "/"),
+        new("特定商取引法に基づく表記", href: null, disabled: true)
+    ];
+}

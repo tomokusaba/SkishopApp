@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- YARP リバースプロキシ -->
+    <PackageReference Include="Yarp.ReverseProxy" Version="2.*" />
+
+    <!-- 認証 -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.*" />
+
+    <!-- 耐障害性 -->
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.*" />
+
+    <!-- キャッシュ（レート制限カウンター用・認証キャッシュ・フォールバック） -->
+    <PackageReference Include="StackExchange.Redis" Version="2.*" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.*" />
+
+    <!-- メッセージング（認証キャッシュ無効化イベント受信） -->
+    <PackageReference Include="Confluent.Kafka" Version="2.*" />
+
+    <!-- Azure 認証・Key Vault 連携（§2 技術スタック準拠） -->
+    <PackageReference Include="Azure.Identity" Version="1.*" />
+    <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.*" />
+    <PackageReference Include="Azure.Extensions.AspNetCore.Configuration.Secrets" Version="1.*" />
+
+    <!-- ヘルスチェック -->
+    <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="9.*" />
+
+    <!-- ロギング -->
+    <PackageReference Include="Serilog.AspNetCore" Version="8.*" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.*" />
+    <PackageReference Include="Serilog.Formatting.Compact" Version="3.*" />
+
+    <!-- OpenTelemetry -->
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.*" />
+
+  </ItemGroup>
+</Project>

@@ -1,0 +1,185 @@
+@implements IAsyncDisposable
+@inject IAiApiClient AiApi
+@inject NavigationManager Navigation
+
+<div class="search-suggest-container" role="combobox" aria-expanded="@(_showSuggestions && _suggestions.Count > 0)"
+     aria-owns="search-suggest-list" aria-haspopup="listbox" @onfocusout="HandleFocusOut">
+    <MudTextField @bind-Value="_searchText"
+                  Placeholder="商品を検索..."
+                  Adornment="Adornment.End"
+                  AdornmentIcon="@Icons.Material.Filled.Search"
+                  OnAdornmentClick="ExecuteSearch"
+                  OnKeyDown="HandleKeyDown"
+                  Immediate="true"
+                  TextChanged="OnSearchTextChanged"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense"
+                  Class="search-input"
+                  aria-label="商品検索"
+                  aria-autocomplete="list"
+                  aria-controls="search-suggest-list"
+                  aria-activedescendant="@(_selectedIndex >= 0 ? $"suggest-item-{_selectedIndex}" : null)" />
+
+    @if (_showSuggestions && _suggestions.Count > 0)
+    {
+        <MudPaper Elevation="4" Class="search-suggest-dropdown" Style="position: absolute; z-index: 1000; width: 100%; max-height: 400px; overflow-y: auto;">
+            <MudList T="string" id="search-suggest-list" role="listbox" aria-label="検索候補" Dense="true">
+                @{
+                    var groupedSuggestions = _suggestions.GroupBy(s => s.Category).ToList();
+                    var globalIndex = 0;
+                }
+                @foreach (var group in groupedSuggestions)
+                {
+                    <MudListSubheader>
+                        <MudText Typo="Typo.caption" Color="Color.Primary">@group.Key</MudText>
+                    </MudListSubheader>
+                    @foreach (var suggestion in group)
+                    {
+                        var idx = globalIndex;
+                        <MudListItem T="string"
+                                     id="@($"suggest-item-{idx}")"
+                                     role="option"
+                                     aria-selected="@(_selectedIndex == idx)"
+                                     Class="@(_selectedIndex == idx ? "mud-selected-item" : "")"
+                                     OnClick="@(() => SelectSuggestion(suggestion))">
+                            <MudText Typo="Typo.body2">@suggestion.Text</MudText>
+                        </MudListItem>
+                        globalIndex++;
+                    }
+                }
+            </MudList>
+        </MudPaper>
+    }
+</div>
+
+<style>
+    .search-suggest-container {
+        position: relative;
+        width: 100%;
+        max-width: 480px;
+    }
+
+    .search-suggest-dropdown {
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+    }
+</style>
+
+@code {
+    private string _searchText = string.Empty;
+    private List<SearchSuggestDto> _suggestions = [];
+    private bool _showSuggestions;
+    private int _selectedIndex = -1;
+    private CancellationTokenSource? _debounceCts;
+
+    private async Task OnSearchTextChanged(string value)
+    {
+        _searchText = value;
+        _selectedIndex = -1;
+
+        if (string.IsNullOrWhiteSpace(value) || value.Length < 2)
+        {
+            _suggestions = [];
+            _showSuggestions = false;
+            return;
+        }
+
+        _debounceCts?.Cancel();
+        _debounceCts = new CancellationTokenSource();
+
+        try
+        {
+            await Task.Delay(300, _debounceCts.Token);
+            _suggestions = await AiApi.GetSearchSuggestionsAsync(value, _debounceCts.Token);
+            _suggestions = _suggestions.Take(10).ToList();
+            _showSuggestions = _suggestions.Count > 0;
+        }
+        catch (OperationCanceledException)
+        {
+            // debounce cancelled
+        }
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                if (_suggestions.Count > 0)
+                {
+                    _selectedIndex = (_selectedIndex + 1) % _suggestions.Count;
+                    _showSuggestions = true;
+                }
+                break;
+            case "ArrowUp":
+                if (_suggestions.Count > 0)
+                {
+                    _selectedIndex = _selectedIndex <= 0 ? _suggestions.Count - 1 : _selectedIndex - 1;
+                }
+                break;
+            case "Enter":
+                if (_selectedIndex >= 0 && _selectedIndex < _suggestions.Count)
+                {
+                    SelectSuggestion(_suggestions[_selectedIndex]);
+                }
+                else
+                {
+                    ExecuteSearch();
+                }
+                break;
+            case "Escape":
+                _showSuggestions = false;
+                _selectedIndex = -1;
+                break;
+        }
+    }
+
+    private void SelectSuggestion(SearchSuggestDto suggestion)
+    {
+        _showSuggestions = false;
+        _selectedIndex = -1;
+
+        if (!string.IsNullOrWhiteSpace(suggestion.ProductId))
+        {
+            Navigation.NavigateTo($"/products/{suggestion.ProductId}");
+        }
+        else
+        {
+            _searchText = suggestion.Text;
+            ExecuteSearch();
+        }
+    }
+
+    private void ExecuteSearch()
+    {
+        _showSuggestions = false;
+        if (!string.IsNullOrWhiteSpace(_searchText))
+        {
+            Navigation.NavigateTo($"/products?keyword={Uri.EscapeDataString(_searchText)}");
+        }
+    }
+
+    private async Task HandleFocusOut()
+    {
+        try
+        {
+            await Task.Delay(200);
+            _showSuggestions = false;
+            StateHasChanged();
+        }
+        catch (ObjectDisposedException)
+        {
+            // コンポーネント破棄後は無視
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_debounceCts is not null)
+        {
+            await _debounceCts.CancelAsync();
+            _debounceCts.Dispose();
+            _debounceCts = null;
+        }
+    }
+}

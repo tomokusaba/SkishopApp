@@ -1,0 +1,125 @@
+@page "/products/{ProductId}/review"
+@rendermode @(RenderMode.InteractiveServer)
+@inject IProductApiClient ProductApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+<PageTitle>レビュー投稿 - Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
+    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4" />
+
+    <MudPaper Elevation="2" Class="pa-6" Style="border-radius: 12px;">
+        <MudText Typo="Typo.h5" Class="mb-4" Style="font-weight: 600;">レビューを投稿</MudText>
+
+        @if (_product is not null)
+        {
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Class="mb-6">
+                <MudImage Src="@(_product.ImageUrls?.FirstOrDefault() ?? "/images/no-image.webp")"
+                          Width="80" Height="80"
+                          ObjectFit="ObjectFit.Contain" Style="border-radius: 8px; background: #f5f5f5;" />
+                <div>
+                    <MudText Typo="Typo.subtitle1">@_product.Name</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Primary">@_product.CategoryName</MudText>
+                </div>
+            </MudStack>
+        }
+
+        <EditForm Model="_model" OnValidSubmit="HandleSubmitAsync" FormName="review-form">
+            <DataAnnotationsValidator />
+
+            <MudText Typo="Typo.subtitle2" Class="mb-2">評価</MudText>
+            <MudRating @bind-SelectedValue="_model.Rating" MaxValue="5" Size="Size.Large" Class="mb-4" />
+            <MudText Typo="Typo.caption" Color="Color.Error">
+                <ValidationMessage For="@(() => _model.Rating)" />
+            </MudText>
+
+            <MudTextField @bind-Value="_model.Comment"
+                          Label="コメント"
+                          Variant="Variant.Outlined"
+                          Lines="5"
+                          MaxLength="1000"
+                          Counter="1000"
+                          HelperText="商品の使用感、良かった点、改善して欲しい点をお書きください"
+                          Class="mb-4" />
+
+            <MudStack Row="true" Spacing="3" Justify="Justify.FlexEnd">
+                <MudButton Variant="Variant.Text" Href="@($"/products/{ProductId}")" Color="Color.Secondary">
+                    キャンセル
+                </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           ButtonType="ButtonType.Submit"
+                           Disabled="@(_isSubmitting || _model.Rating <= 0)"
+                           StartIcon="@Icons.Material.Filled.Send">
+                    @if (_isSubmitting)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    }
+                    投稿する
+                </MudButton>
+            </MudStack>
+        </EditForm>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Parameter] public string ProductId { get; set; } = string.Empty;
+
+    private ProductDto? _product;
+    private ReviewModel _model = new();
+    private bool _isSubmitting;
+
+    private List<BreadcrumbItem> _breadcrumbs =
+    [
+        new("ホーム", href: "/"),
+        new("商品一覧", href: "/products"),
+        new("レビュー投稿", href: null, disabled: true)
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _product = await ProductApi.GetProductByIdAsync(ProductId);
+        if (_product is not null)
+        {
+            _breadcrumbs =
+            [
+                new("ホーム", href: "/"),
+                new("商品一覧", href: "/products"),
+                new(_product.Name, href: $"/products/{ProductId}"),
+                new("レビュー投稿", href: null, disabled: true)
+            ];
+        }
+    }
+
+    private async Task HandleSubmitAsync()
+    {
+        if (_isSubmitting) return;
+        _isSubmitting = true;
+
+        try
+        {
+            await ProductApi.PostReviewAsync(ProductId, new CreateReviewRequest(_model.Rating, _model.Comment));
+            Snackbar.Add("レビューを投稿しました。ありがとうございます！", Severity.Success);
+            Navigation.NavigateTo($"/products/{ProductId}");
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("レビューの投稿に失敗しました。しばらく経ってからお試しください。", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private sealed class ReviewModel
+    {
+        [System.ComponentModel.DataAnnotations.Range(1, 5, ErrorMessage = "評価を選択してください")]
+        public int Rating { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "コメントを入力してください")]
+        [System.ComponentModel.DataAnnotations.StringLength(1000, MinimumLength = 10, ErrorMessage = "コメントは 10 文字以上 1000 文字以内で入力してください")]
+        public string Comment { get; set; } = string.Empty;
+    }
+}

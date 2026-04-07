@@ -1,0 +1,279 @@
+@page
+@model AdminPortal.Pages.Admin.Ai.Analytics.IndexModel
+@{
+    ViewData["Title"] = "AI 分析ダッシュボード";
+    Layout = "/Pages/Admin/_Layout.cshtml";
+}
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="bi bi-pie-chart"></i> AI 分析ダッシュボード</h1>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <form method="get" class="d-flex align-items-end gap-2">
+                <input type="hidden" name="ActiveTab" value="@Model.ActiveTab" />
+                <div class="flex-grow-1">
+                    <label class="form-label">期間</label>
+                    <select name="PeriodFilter" class="form-select" onchange="this.form.submit()">
+                        <option value="last7days" selected="@(Model.PeriodFilter == "last7days")">過去7日</option>
+                        <option value="last30days" selected="@(Model.PeriodFilter == "last30days")">過去30日</option>
+                        <option value="last90days" selected="@(Model.PeriodFilter == "last90days")">過去90日</option>
+                        <option value="lastYear" selected="@(Model.PeriodFilter == "lastYear")">過去1年</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link @(Model.ActiveTab == "search" ? "active" : "")"
+               asp-page="/Admin/Ai/Analytics/Index" asp-route-activeTab="search"
+               asp-route-periodFilter="@Model.PeriodFilter">検索分析</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(Model.ActiveTab == "recommendation" ? "active" : "")"
+               asp-page="/Admin/Ai/Analytics/Index" asp-route-activeTab="recommendation"
+               asp-route-periodFilter="@Model.PeriodFilter">レコメンド分析</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(Model.ActiveTab == "chat" ? "active" : "")"
+               asp-page="/Admin/Ai/Analytics/Index" asp-route-activeTab="chat"
+               asp-route-periodFilter="@Model.PeriodFilter">チャット分析</a>
+        </li>
+    </ul>
+
+    @if (Model.ActiveTab == "search")
+    {
+        @if (Model.SearchAnalytics is not null)
+        {
+            <div class="row g-4 mb-4">
+                <div class="col-md-4">
+                    <div class="card text-white bg-primary">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">総検索数</h6>
+                            <h2>@Model.SearchAnalytics.TotalSearches.ToString("N0")</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-white bg-success">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">ユニークユーザー数</h6>
+                            <h2>@Model.SearchAnalytics.UniqueUsers.ToString("N0")</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-white bg-info">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">平均結果数</h6>
+                            <h2>@Model.SearchAnalytics.AverageResultCount.ToString("N1")</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">人気検索キーワード</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>キーワード</th>
+                                    <th>検索回数</th>
+                                    <th>コンバージョン率</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var term in Model.SearchAnalytics.TopSearchTerms)
+                                {
+                                    <tr>
+                                        <td>@term.Term</td>
+                                        <td>@term.Count</td>
+                                        <td>@term.ConversionRate.ToString("P1")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">検索推移チャート</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-graph-up" style="font-size: 3rem;"></i>
+                        <p class="mt-2">チャートは将来のバージョンで実装予定です。</p>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-warning">検索分析データの取得に失敗しました。</div>
+        }
+    }
+    else if (Model.ActiveTab == "recommendation")
+    {
+        @if (Model.RecommendationAnalytics is not null)
+        {
+            <div class="row g-4 mb-4">
+                <div class="col-md-4">
+                    <div class="card text-white bg-primary">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">総レコメンド数</h6>
+                            <h2>@Model.RecommendationAnalytics.TotalRecommendations.ToString("N0")</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-white bg-success">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">クリック率</h6>
+                            <h2>@Model.RecommendationAnalytics.ClickThroughRate.ToString("P1")</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-white bg-warning">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">コンバージョン率</h6>
+                            <h2>@Model.RecommendationAnalytics.ConversionRate.ToString("P1")</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">タイプ別統計</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>レコメンドタイプ</th>
+                                    <th>表示回数</th>
+                                    <th>CTR</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var stat in Model.RecommendationAnalytics.TypeStats)
+                                {
+                                    <tr>
+                                        <td>@stat.Type</td>
+                                        <td>@stat.Count</td>
+                                        <td>@stat.Ctr.ToString("P1")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">レコメンド推移チャート</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-graph-up" style="font-size: 3rem;"></i>
+                        <p class="mt-2">チャートは将来のバージョンで実装予定です。</p>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-warning">レコメンド分析データの取得に失敗しました。</div>
+        }
+    }
+    else if (Model.ActiveTab == "chat")
+    {
+        @if (Model.ChatAnalytics is not null)
+        {
+            <div class="row g-4 mb-4">
+                <div class="col-md-4">
+                    <div class="card text-white bg-primary">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">総セッション数</h6>
+                            <h2>@Model.ChatAnalytics.TotalSessions.ToString("N0")</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-white bg-info">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">平均セッション時間</h6>
+                            <h2>@Model.ChatAnalytics.AverageSessionDuration.ToString("N1") 分</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-white bg-success">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">満足度</h6>
+                            <h2>@Model.ChatAnalytics.SatisfactionRate.ToString("P1")</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">トピック別統計</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>トピック</th>
+                                    <th>件数</th>
+                                    <th>解決率</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var topic in Model.ChatAnalytics.TopTopics)
+                                {
+                                    <tr>
+                                        <td>@topic.Topic</td>
+                                        <td>@topic.Count</td>
+                                        <td>@topic.ResolutionRate.ToString("P1")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">チャット推移チャート</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-graph-up" style="font-size: 3rem;"></i>
+                        <p class="mt-2">チャートは将来のバージョンで実装予定です。</p>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-warning">チャット分析データの取得に失敗しました。</div>
+        }
+    }
+</div>

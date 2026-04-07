@@ -1,0 +1,112 @@
+@inherits LayoutComponentBase
+@inject IState<Frontend.Store.CartStore.CartState> CartState
+@inject IStringLocalizer<SharedResources> L
+
+@* §16.6 準拠 — スキップリンク + ARIA ランドマーク構造 *@
+<SkipLink />
+
+<MudThemeProvider Theme="_skiShopTheme" IsDarkMode="false" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <header role="banner">
+        <MudAppBar Elevation="2" Dense="false" Class="skishop-appbar">
+            <MudIconButton Icon="@Icons.Material.Filled.AcUnit"
+                           Color="Color.Inherit"
+                           Href="/"
+                           aria-label="@L["Accessibility_HomeLink"]" />
+            <MudText Typo="Typo.h6" Class="ml-1 d-none d-md-flex skishop-brand">
+                Azure SkiShop
+            </MudText>
+
+            <MudSpacer />
+
+            <nav role="navigation" aria-label="@L["Nav_MainNavigation"]"
+                 style="display:flex;align-items:center;">
+                <NavMenu />
+            </nav>
+
+            <MudSpacer />
+
+            <LanguageSwitcher />
+
+            <MudBadge Content="@CartState.Value.TotalItemCount"
+                      Color="Color.Error"
+                      Overlap="true"
+                      Visible="@(CartState.Value.TotalItemCount > 0)">
+                <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart"
+                               Color="Color.Inherit"
+                               Href="/cart"
+                               aria-label="@string.Format(L["Common_CartItems"], CartState.Value.TotalItemCount)" />
+            </MudBadge>
+            <MudIconButton Icon="@Icons.Material.Filled.Person"
+                           Color="Color.Inherit"
+                           Href="/auth/login"
+                           aria-label="@L["Nav_Account"]" />
+        </MudAppBar>
+    </header>
+
+    <MudMainContent Class="skishop-main" id="main-content" role="main">
+        @Body
+    </MudMainContent>
+
+    <footer role="contentinfo">
+        <Footer />
+    </footer>
+</MudLayout>
+
+<CookieConsentBanner />
+
+@code {
+    private readonly MudTheme _skiShopTheme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#1565C0",
+            Secondary = "#0D47A1",
+            Tertiary = "#00ACC1",
+            AppbarBackground = "#1565C0",
+            AppbarText = "#FFFFFF",
+            Background = "#F5F7FA",
+            Surface = "#FFFFFF",
+            TextPrimary = "#212121",
+            TextSecondary = "#616161",
+            ActionDefault = "#1565C0",
+            DrawerBackground = "#FFFFFF",
+            DrawerText = "#212121",
+            Success = "#2E7D32",
+            Warning = "#F57F17",
+            Error = "#C62828",
+            Info = "#0288D1"
+        },
+        LayoutProperties = new LayoutProperties
+        {
+            DefaultBorderRadius = "12px",
+            AppbarHeight = "64px"
+        },
+        Typography = new Typography
+        {
+            Default = new DefaultTypography
+            {
+                FontFamily = ["Inter", "Noto Sans JP", "sans-serif"]
+            },
+            H1 = new H1Typography
+            {
+                FontWeight = "700",
+                FontSize = "2.5rem"
+            },
+            H2 = new H2Typography
+            {
+                FontWeight = "600",
+                FontSize = "2rem"
+            },
+            H3 = new H3Typography
+            {
+                FontWeight = "600",
+                FontSize = "1.5rem"
+            }
+        }
+    };
+}

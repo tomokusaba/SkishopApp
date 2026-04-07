@@ -1,0 +1,208 @@
+@page "/checkout/guest"
+@rendermode @(RenderMode.InteractiveServer)
+
+@inject IPaymentApiClient PaymentApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject ILogger<Guest> Logger
+
+<PageTitle>ゲスト購入 - Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
+    <MudText Typo="Typo.h5" Class="mb-4" Style="font-weight: 700;">ゲスト購入</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+        会員登録なしでお買い物いただけます。ポイント付与・クーポン適用は会員限定となります。
+    </MudText>
+
+    <MudPaper Elevation="2" Class="pa-6" Style="border-radius: 12px;">
+        <EditForm Model="_guestForm" OnValidSubmit="SubmitGuestCheckoutAsync">
+            <DataAnnotationsValidator />
+
+            <MudText Typo="Typo.body2" Color="Color.Info" Class="mb-4">
+                ご入力いただいた個人情報は、ご注文の処理・配送・注文確認メールの送信に使用します。
+            </MudText>
+
+            @* Email *@
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_guestForm.Email" Label="メールアドレス" Required="true"
+                                  InputType="InputType.Email" Variant="Variant.Outlined"
+                                  For="@(() => _guestForm.Email)" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_guestForm.EmailConfirmation" Label="メールアドレス（確認）" Required="true"
+                                  InputType="InputType.Email" Variant="Variant.Outlined"
+                                  For="@(() => _guestForm.EmailConfirmation)" />
+                </MudItem>
+
+                @* Shipping address *@
+                <MudItem xs="12"><MudText Typo="Typo.subtitle1" Style="font-weight: 600;">配送先</MudText></MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_guestForm.FullName" Label="氏名" Required="true"
+                                  Variant="Variant.Outlined" For="@(() => _guestForm.FullName)" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_guestForm.PostalCode" Label="郵便番号" Required="true"
+                                  Variant="Variant.Outlined" Placeholder="123-4567"
+                                  For="@(() => _guestForm.PostalCode)" />
+                </MudItem>
+                <MudItem xs="12" sm="8">
+                    <MudTextField @bind-Value="_guestForm.Prefecture" Label="都道府県" Required="true"
+                                  Variant="Variant.Outlined" For="@(() => _guestForm.Prefecture)" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_guestForm.City" Label="市区町村" Required="true"
+                                  Variant="Variant.Outlined" For="@(() => _guestForm.City)" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_guestForm.AddressLine1" Label="番地" Required="true"
+                                  Variant="Variant.Outlined" For="@(() => _guestForm.AddressLine1)" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_guestForm.AddressLine2" Label="建物名・部屋番号（任意）"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_guestForm.PhoneNumber" Label="電話番号" Required="true"
+                                  Variant="Variant.Outlined" For="@(() => _guestForm.PhoneNumber)" />
+                </MudItem>
+
+                @* Shipping method *@
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle1" Class="mb-2" Style="font-weight: 600;">配送方法</MudText>
+                    <MudRadioGroup @bind-Value="_guestForm.ShippingMethod">
+                        <MudRadio T="string" Value="@("standard")" Color="Color.Primary">標準配送（3-5 営業日）</MudRadio>
+                        <MudRadio T="string" Value="@("express")" Color="Color.Primary">お急ぎ便（1-2 営業日） +¥330</MudRadio>
+                    </MudRadioGroup>
+                </MudItem>
+
+                @* Consent checkboxes *@
+                <MudItem xs="12">
+                    <MudCheckBox @bind-Value="_guestForm.ConsentPrivacyPolicy" Color="Color.Primary" Required="true">
+                        <MudLink Href="/legal/privacy" Target="_blank" Underline="Underline.Always">プライバシーポリシー</MudLink> に同意する（必須）
+                    </MudCheckBox>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudCheckBox @bind-Value="_guestForm.ConsentOverseasTransfer" Color="Color.Primary">
+                        注文確認メールの送信のため、入力されたメールアドレスおよび注文情報を米国に所在するメール配信サービス（SendGrid）に提供します。
+                        <MudLink Href="/legal/privacy" Target="_blank" Underline="Underline.Always">詳細はプライバシーポリシーをご確認ください</MudLink>
+                    </MudCheckBox>
+                </MudItem>
+            </MudGrid>
+
+            @if (!string.IsNullOrEmpty(_emailError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-4">@_emailError</MudAlert>
+            }
+
+            <div style="display: flex; justify-content: space-between; margin-top: 2rem;">
+                <MudButton Variant="Variant.Text" Color="Color.Default" Href="/cart"
+                           StartIcon="@Icons.Material.Filled.ArrowBack">
+                    カートに戻る
+                </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" ButtonType="ButtonType.Submit"
+                           Disabled="@(_isSubmitting || !_guestForm.ConsentPrivacyPolicy)"
+                           StartIcon="@Icons.Material.Filled.Payment">
+                    @(_isSubmitting ? "処理中..." : "決済に進む")
+                </MudButton>
+            </div>
+        </EditForm>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private GuestFormModel _guestForm = new();
+    private bool _isSubmitting;
+    private string? _emailError;
+
+    private async Task SubmitGuestCheckoutAsync()
+    {
+        _emailError = null;
+
+        if (_guestForm.Email != _guestForm.EmailConfirmation)
+        {
+            _emailError = "メールアドレスが一致しません";
+            return;
+        }
+
+        if (!_guestForm.ConsentPrivacyPolicy)
+        {
+            _emailError = "プライバシーポリシーへの同意が必要です";
+            return;
+        }
+
+        _isSubmitting = true;
+        try
+        {
+            var request = new GuestCheckoutRequest(
+                Email: _guestForm.Email,
+                EmailConfirmation: _guestForm.EmailConfirmation,
+                ShippingAddress: new GuestShippingAddress(
+                    _guestForm.FullName, _guestForm.PostalCode, _guestForm.Prefecture,
+                    _guestForm.City, _guestForm.AddressLine1, _guestForm.AddressLine2,
+                    _guestForm.PhoneNumber),
+                ShippingMethod: _guestForm.ShippingMethod,
+                CartId: "from-cookie",
+                ConsentOverseasTransfer: _guestForm.ConsentOverseasTransfer,
+                ConsentPrivacyPolicy: _guestForm.ConsentPrivacyPolicy);
+
+            var response = await PaymentApi.GuestCheckoutAsync(request);
+
+            if (response?.CheckoutSessionUrl is not null)
+            {
+                Navigation.NavigateTo(response.CheckoutSessionUrl, forceLoad: true);
+            }
+            else
+            {
+                Snackbar.Add("チェックアウトの処理に失敗しました", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "ゲストチェックアウトエラー");
+            Snackbar.Add("エラーが発生しました。もう一度お試しください", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private class GuestFormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "メールアドレスは必須です")]
+        [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "有効なメールアドレスを入力してください")]
+        public string Email { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "メールアドレス（確認）は必須です")]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string EmailConfirmation { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "氏名は必須です")]
+        [System.ComponentModel.DataAnnotations.StringLength(100)]
+        public string FullName { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "郵便番号は必須です")]
+        public string PostalCode { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "都道府県は必須です")]
+        public string Prefecture { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "市区町村は必須です")]
+        public string City { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "番地は必須です")]
+        public string AddressLine1 { get; set; } = string.Empty;
+
+        public string? AddressLine2 { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "電話番号は必須です")]
+        [System.ComponentModel.DataAnnotations.Phone]
+        public string PhoneNumber { get; set; } = string.Empty;
+
+        public string ShippingMethod { get; set; } = "standard";
+
+        public bool ConsentPrivacyPolicy { get; set; }
+        public bool ConsentOverseasTransfer { get; set; }
+    }
+}

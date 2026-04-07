@@ -1,0 +1,312 @@
+@page "/points"
+@rendermode @(RenderMode.InteractiveServer)
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@inject IPointApiClient PointApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject ILogger<Index> Logger
+
+<PageTitle>ポイント - Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4" />
+
+    <MudText Typo="Typo.h4" Class="mb-6" Style="font-weight: 700;">
+        <MudIcon Icon="@Icons.Material.Filled.Stars" Class="mr-2" /> ポイント
+    </MudText>
+
+    @* 失効予定ポイントアラート *@
+    @if (_expiringPoints is { ExpiringPoints: > 0 })
+    {
+        <PointExpiryAlert ExpiringPoints="_expiringPoints.ExpiringPoints"
+                          ExpiryDate="_expiringPoints.ExpiryDate" />
+    }
+
+    @* ティア情報セクション *@
+    @if (_tierInfo is not null)
+    {
+        <MudCard Elevation="3" Class="mb-6" Style="border-radius: 12px;">
+            <MudCardContent>
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudAvatar Color="@GetTierColor(_tierInfo.CurrentTier)" Size="Size.Large">
+                            <MudIcon Icon="@GetTierIcon(_tierInfo.CurrentTier)" />
+                        </MudAvatar>
+                        <div>
+                            <MudText Typo="Typo.h5" Style="font-weight: 700;">@_tierInfo.CurrentTier ランク</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                累計 @_tierInfo.CurrentPoints.ToString("N0") pt
+                            </MudText>
+                        </div>
+                    </MudStack>
+                </MudStack>
+
+                @if (_tierInfo.NextTier is not null && _tierInfo.NextTierThreshold > 0)
+                {
+                    var progress = _tierInfo.NextTierThreshold > 0
+                        ? (double)_tierInfo.CurrentPoints / _tierInfo.NextTierThreshold * 100
+                        : 0;
+
+                    <MudText Typo="Typo.body2" Class="mb-2" Color="Color.Secondary">
+                        あと <strong>@_tierInfo.PointsToNextTier.ToString("N0")</strong> pt で
+                        <strong>@_tierInfo.NextTier</strong> ランク達成！
+                    </MudText>
+                    <MudProgressLinear Value="@progress" Color="Color.Primary" Rounded="true"
+                                       Size="Size.Large" Class="mb-4" />
+                }
+
+                @if (_tierInfo.Benefits.Count > 0)
+                {
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">ランク特典</MudText>
+                    <MudStack Spacing="1">
+                        @foreach (var benefit in _tierInfo.Benefits)
+                        {
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success"
+                                         Size="Size.Small" />
+                                <MudText Typo="Typo.body2">@benefit</MudText>
+                            </MudStack>
+                        }
+                    </MudStack>
+                }
+            </MudCardContent>
+        </MudCard>
+    }
+
+    @* ポイント残高セクション *@
+    @if (_isLoadingBalance)
+    {
+        <MudStack Row="true" Spacing="4" Class="mb-6">
+            @for (var i = 0; i < 3; i++)
+            {
+                <MudCard Elevation="2" Style="border-radius: 12px; flex: 1;">
+                    <MudCardContent>
+                        <MudSkeleton Width="60%" />
+                        <MudSkeleton Width="40%" Height="40px" />
+                    </MudCardContent>
+                </MudCard>
+            }
+        </MudStack>
+    }
+    else if (_balance is not null)
+    {
+        <MudGrid Class="mb-6">
+            <MudItem xs="12" sm="4">
+                <MudCard Elevation="2" Style="border-radius: 12px;">
+                    <MudCardContent Class="text-center">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">合計ポイント</MudText>
+                        <MudText Typo="Typo.h4" Style="font-weight: 700;" Color="Color.Primary">
+                            @_balance.TotalPoints.ToString("N0")
+                        </MudText>
+                        <MudText Typo="Typo.caption">pt</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudCard Elevation="2" Style="border-radius: 12px;">
+                    <MudCardContent Class="text-center">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">利用可能ポイント</MudText>
+                        <MudText Typo="Typo.h4" Style="font-weight: 700;" Color="Color.Success">
+                            @_balance.AvailablePoints.ToString("N0")
+                        </MudText>
+                        <MudText Typo="Typo.caption">pt</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudCard Elevation="2" Style="border-radius: 12px;">
+                    <MudCardContent Class="text-center">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">処理中ポイント</MudText>
+                        <MudText Typo="Typo.h4" Style="font-weight: 700;">
+                            @_balance.PendingPoints.ToString("N0")
+                        </MudText>
+                        <MudText Typo="Typo.caption">pt</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    }
+
+    @* ポイント履歴テーブル *@
+    <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 600;">ポイント履歴</MudText>
+
+    <MudTable @ref="_table"
+              ServerData="LoadHistoryAsync"
+              Hover="true"
+              Elevation="2"
+              Dense="true"
+              Style="border-radius: 12px;"
+              Loading="_isLoadingHistory"
+              LoadingProgressColor="Color.Primary"
+              RowsPerPage="10"
+              T="PointHistoryDto">
+        <HeaderContent>
+            <MudTh>日時</MudTh>
+            <MudTh>種別</MudTh>
+            <MudTh Style="text-align: right;">ポイント</MudTh>
+            <MudTh>説明</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="日時">@context.OccurredAt.ToString("yyyy/MM/dd HH:mm")</MudTd>
+            <MudTd DataLabel="種別">
+                <MudChip T="string"
+                         Color="@GetTransactionColor(context.TransactionType)"
+                         Size="Size.Small"
+                         Variant="Variant.Filled">
+                    @GetTransactionLabel(context.TransactionType)
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="ポイント" Style="text-align: right; font-weight: 600;">
+                <MudText Color="@GetPointColor(context.TransactionType)">
+                    @(GetPointPrefix(context.TransactionType))@context.Points.ToString("N0")
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="説明">
+                @context.Description
+                @if (context.OrderId is not null)
+                {
+                    <MudLink Href="@($"/orders/{context.OrderId}")" Color="Color.Primary" Class="ml-1">
+                        (注文を表示)
+                    </MudLink>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudPaper Elevation="0" Class="pa-8 text-center">
+                <MudIcon Icon="@Icons.Material.Filled.HistoryToggleOff" Size="Size.Large"
+                         Color="Color.Default" Class="mb-4" />
+                <MudText Typo="Typo.h6" Class="mb-2">ポイント履歴がありません</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+                    お買い物をするとポイントが貯まります。
+                </MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/products"
+                           StartIcon="@Icons.Material.Filled.Search">
+                    商品を探す
+                </MudButton>
+            </MudPaper>
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 5, 10, 20 }"
+                           InfoFormat="{first_item}-{last_item} / {all_items} 件" />
+        </PagerContent>
+    </MudTable>
+</MudContainer>
+
+@code {
+    private MudTable<PointHistoryDto>? _table;
+    private PointBalanceDto? _balance;
+    private TierInfoDto? _tierInfo;
+    private ExpiringPointsDto? _expiringPoints;
+    private bool _isLoadingBalance = true;
+    private bool _isLoadingHistory;
+
+    private readonly List<BreadcrumbItem> _breadcrumbs =
+    [
+        new("ホーム", href: "/"),
+        new("ポイント", href: null, disabled: true)
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var balanceTask = PointApi.GetBalanceAsync();
+            var tierTask = PointApi.GetTierInfoAsync();
+            var expiringTask = PointApi.GetExpiringPointsAsync();
+
+            await Task.WhenAll(balanceTask, tierTask, expiringTask);
+
+            _balance = await balanceTask;
+            _tierInfo = await tierTask;
+            _expiringPoints = await expiringTask;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "ポイント情報の取得に失敗しました");
+            Snackbar.Add("ポイント情報の読み込みに失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingBalance = false;
+        }
+    }
+
+    private async Task<TableData<PointHistoryDto>> LoadHistoryAsync(TableState state, CancellationToken ct)
+    {
+        _isLoadingHistory = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await PointApi.GetHistoryAsync(state.Page, state.PageSize, ct);
+            if (result is null)
+            {
+                return new TableData<PointHistoryDto> { Items = [], TotalItems = 0 };
+            }
+
+            return new TableData<PointHistoryDto>
+            {
+                Items = result.Items,
+                TotalItems = (int)result.TotalElements
+            };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "ポイント履歴の取得に失敗しました");
+            Snackbar.Add("ポイント履歴の読み込みに失敗しました", Severity.Error);
+            return new TableData<PointHistoryDto> { Items = [], TotalItems = 0 };
+        }
+        finally
+        {
+            _isLoadingHistory = false;
+            StateHasChanged();
+        }
+    }
+
+    private static Color GetTransactionColor(string transactionType) => transactionType switch
+    {
+        "EARN" or "earn" => Color.Success,
+        "USE" or "use" => Color.Error,
+        "EXPIRE" or "expire" => Color.Default,
+        _ => Color.Info
+    };
+
+    private static string GetTransactionLabel(string transactionType) => transactionType switch
+    {
+        "EARN" or "earn" => "獲得",
+        "USE" or "use" => "使用",
+        "EXPIRE" or "expire" => "失効",
+        _ => transactionType
+    };
+
+    private static Color GetPointColor(string transactionType) => transactionType switch
+    {
+        "EARN" or "earn" => Color.Success,
+        "USE" or "use" or "EXPIRE" or "expire" => Color.Error,
+        _ => Color.Default
+    };
+
+    private static string GetPointPrefix(string transactionType) => transactionType switch
+    {
+        "EARN" or "earn" => "+",
+        "USE" or "use" or "EXPIRE" or "expire" => "-",
+        _ => ""
+    };
+
+    private static Color GetTierColor(string tier) => tier.ToUpperInvariant() switch
+    {
+        "PLATINUM" => Color.Dark,
+        "GOLD" => Color.Warning,
+        "SILVER" => Color.Default,
+        _ => Color.Surface
+    };
+
+    private static string GetTierIcon(string tier) => tier.ToUpperInvariant() switch
+    {
+        "PLATINUM" => Icons.Material.Filled.Diamond,
+        "GOLD" => Icons.Material.Filled.EmojiEvents,
+        "SILVER" => Icons.Material.Filled.WorkspacePremium,
+        _ => Icons.Material.Filled.Stars
+    };
+}

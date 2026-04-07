@@ -1,0 +1,131 @@
+@page "/checkout/complete"
+@rendermode @(RenderMode.InteractiveServer)
+
+@inject IOrderApiClient OrderApi
+@inject NavigationManager Navigation
+@inject ILogger<Complete> Logger
+
+<PageTitle>注文完了 - Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
+    <Frontend.Components.Shared.StepIndicator CurrentStep="5" />
+
+    @if (_isPolling)
+    {
+        <MudPaper Elevation="2" Class="pa-8 text-center" Style="border-radius: 12px;">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" Class="mb-4"
+                                 role="progressbar" aria-label="注文処理中" />
+            <MudText Typo="Typo.h5" Class="mb-2">注文を処理しています...</MudText>
+            <MudText Typo="Typo.body1" Color="Color.Secondary">しばらくお待ちください</MudText>
+        </MudPaper>
+    }
+    else if (_orderStatus == "CONFIRMED")
+    {
+        <MudPaper Elevation="2" Class="pa-8 text-center" Style="border-radius: 12px;" role="alert" aria-live="assertive">
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" Class="mb-4" />
+            <MudText Typo="Typo.h4" Class="mb-2" Style="font-weight: 700; color: #2e7d32;">ご注文ありがとうございます！</MudText>
+            <MudText Typo="Typo.h6" Class="mb-4">注文番号: @_order?.OrderNumber</MudText>
+            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-6">
+                注文確認メールをお送りしました。
+            </MudText>
+
+            <MudStack Row="true" Justify="Justify.Center" Spacing="3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           Href="@($"/orders/{_order?.Id}")"
+                           StartIcon="@Icons.Material.Filled.Receipt">
+                    注文詳細を見る
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           Href="/products"
+                           StartIcon="@Icons.Material.Filled.ShoppingBag">
+                    ショッピングを続ける
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+    else if (_orderStatus is "FAILED" or "CANCELLED")
+    {
+        <MudPaper Elevation="2" Class="pa-8 text-center" Style="border-radius: 12px;" role="alert" aria-live="assertive">
+            <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Large" Class="mb-4" />
+            <MudText Typo="Typo.h5" Class="mb-2" Color="Color.Error">注文処理に失敗しました</MudText>
+            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+                申し訳ございません。お手数ですが再度ご注文をお試しください。
+            </MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/cart"
+                       StartIcon="@Icons.Material.Filled.ShoppingCart">
+                カートに戻って再注文
+            </MudButton>
+        </MudPaper>
+    }
+    else if (_isTimeout)
+    {
+        <MudPaper Elevation="2" Class="pa-8 text-center" Style="border-radius: 12px;">
+            <MudIcon Icon="@Icons.Material.Filled.HourglassBottom" Color="Color.Warning" Size="Size.Large" Class="mb-4" />
+            <MudText Typo="Typo.h5" Class="mb-2">注文処理中です</MudText>
+            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+                完了次第メールでお知らせします。しばらくお待ちください。
+            </MudText>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/products">
+                ショッピングを続ける
+            </MudButton>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    [SupplyParameterFromQuery] public string? OrderId { get; set; }
+    [SupplyParameterFromQuery(Name = "session_id")] public string? SessionId { get; set; }
+
+    private OrderDto? _order;
+    private string? _orderStatus;
+    private bool _isPolling = true;
+    private bool _isTimeout;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(OrderId) && string.IsNullOrEmpty(SessionId))
+        {
+            Navigation.NavigateTo("/cart");
+            return;
+        }
+
+        await PollOrderStatusAsync();
+    }
+
+    private async Task PollOrderStatusAsync()
+    {
+        var maxAttempts = 10;
+        for (var attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(OrderId))
+                {
+                    _order = await OrderApi.GetOrderAsync(OrderId);
+                }
+                _orderStatus = _order?.Status;
+
+                if (_orderStatus is "CONFIRMED" or "FAILED" or "CANCELLED")
+                {
+                    _isPolling = false;
+                    StateHasChanged();
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "注文ステータスポーリングエラー: Attempt={Attempt}", attempt + 1);
+            }
+
+            if (attempt < maxAttempts - 1)
+            {
+                await Task.Delay(3000);
+                StateHasChanged();
+            }
+        }
+
+        _isPolling = false;
+        _isTimeout = true;
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,196 @@
+@page "/mypage/settings"
+@rendermode @(RenderMode.InteractiveServer)
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject Frontend.Services.Interfaces.IApiGatewayClient ApiClient
+@inject ISnackbar Snackbar
+@inject ILogger<Frontend.Components.Pages.MyPage.Settings> Logger
+
+<PageTitle>ユーザー設定 — Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack"
+               Href="/mypage" Class="mb-4">
+        マイページに戻る
+    </MudButton>
+
+    <MudPaper Elevation="4" Class="pa-8 rounded-lg">
+        <div class="text-center mb-6">
+            <MudIcon Icon="@Icons.Material.Filled.Settings" Color="Color.Primary" Size="Size.Large" />
+            <MudText Typo="Typo.h4" Class="mt-2" Style="font-weight: 700; color: #1565C0;">
+                ユーザー設定
+            </MudText>
+        </div>
+
+        @if (_isLoading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+        }
+        else
+        {
+            <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 600;">
+                <MudIcon Icon="@Icons.Material.Filled.Email" Class="mr-2" />
+                メール通知設定
+            </MudText>
+
+            <MudPaper Elevation="0" Class="pa-4 mb-2" Style="background: #f5f5f5; border-radius: 8px;">
+                <div class="d-flex align-center justify-space-between">
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Style="font-weight: 600;">注文確認メール</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">注文完了時に確認メールを送信します。</MudText>
+                    </div>
+                    <MudSwitch T="bool" Value="true" Disabled="true" Color="Color.Primary" />
+                </div>
+            </MudPaper>
+
+            <MudPaper Elevation="0" Class="pa-4 mb-2" Style="background: #f5f5f5; border-radius: 8px;">
+                <div class="d-flex align-center justify-space-between">
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Style="font-weight: 600;">発送通知メール</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">商品の発送時に通知メールを送信します。</MudText>
+                    </div>
+                    <MudSwitch @bind-Value="_shippingNotification" Color="Color.Primary" />
+                </div>
+            </MudPaper>
+
+            <MudPaper Elevation="0" Class="pa-4 mb-2" Style="background: #f5f5f5; border-radius: 8px;">
+                <div class="d-flex align-center justify-space-between">
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Style="font-weight: 600;">プロモーション・セール情報メール</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">セールやキャンペーン情報をお届けします。</MudText>
+                    </div>
+                    <MudSwitch @bind-Value="_promotionEmail" Color="Color.Primary" />
+                </div>
+            </MudPaper>
+
+            <MudPaper Elevation="0" Class="pa-4 mb-4" Style="background: #f5f5f5; border-radius: 8px;">
+                <div class="d-flex align-center justify-space-between">
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Style="font-weight: 600;">ポイント失効予告メール</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">ポイントの有効期限が近づいた際に通知します。</MudText>
+                    </div>
+                    <MudSwitch @bind-Value="_pointExpiryEmail" Color="Color.Primary" />
+                </div>
+            </MudPaper>
+
+            <MudDivider Class="my-6" />
+
+            <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 600;">
+                <MudIcon Icon="@Icons.Material.Filled.DisplaySettings" Class="mr-2" />
+                表示設定
+            </MudText>
+
+            <MudSelect @bind-Value="_language"
+                       Label="言語"
+                       Variant="Variant.Outlined"
+                       Class="mb-4"
+                       Adornment="Adornment.Start"
+                       AdornmentIcon="@Icons.Material.Filled.Language">
+                <MudSelectItem Value="@("ja")">日本語</MudSelectItem>
+                <MudSelectItem Value="@("en")">English</MudSelectItem>
+            </MudSelect>
+
+            <MudSelect @bind-Value="_theme"
+                       Label="テーマ"
+                       Variant="Variant.Outlined"
+                       Class="mb-6"
+                       Adornment="Adornment.Start"
+                       AdornmentIcon="@Icons.Material.Filled.Palette">
+                <MudSelectItem Value="@("light")">ライト</MudSelectItem>
+                <MudSelectItem Value="@("dark")">ダーク</MudSelectItem>
+                <MudSelectItem Value="@("system")">システム設定</MudSelectItem>
+            </MudSelect>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       Size="Size.Large"
+                       OnClick="HandleSaveAsync"
+                       Disabled="@_isSaving"
+                       Style="min-height: 48px;">
+                @if (_isSaving)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                設定を保存する
+            </MudButton>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private string? _userId;
+
+    private bool _shippingNotification = true;
+    private bool _promotionEmail;
+    private bool _pointExpiryEmail = true;
+    private string _language = "ja";
+    private string _theme = "light";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var profile = await ApiClient.GetAsync<UserProfileDto>("/api/v1/users/me");
+            _userId = profile?.Id;
+
+            if (_userId is not null)
+            {
+                var prefs = await ApiClient.GetAsync<UserPreferencesDto>($"/api/v1/users/{_userId}/preferences");
+                if (prefs is not null)
+                {
+                    _shippingNotification = prefs.ShippingNotificationEmail;
+                    _promotionEmail = prefs.PromotionEmail;
+                    _pointExpiryEmail = prefs.PointExpiryEmail;
+                    _language = prefs.Language ?? "ja";
+                    _theme = prefs.Theme ?? "light";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "ユーザー設定の読み込みに失敗: {Message}", ex.Message);
+            Snackbar.Add("設定の読み込みに失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleSaveAsync()
+    {
+        if (_userId is null) return;
+        _isSaving = true;
+
+        try
+        {
+            var request = new UpdatePreferencesRequest(
+                OrderConfirmationEmail: true,
+                ShippingNotificationEmail: _shippingNotification,
+                PromotionEmail: _promotionEmail,
+                PointExpiryEmail: _pointExpiryEmail,
+                Language: _language,
+                Theme: _theme);
+
+            await ApiClient.PutAsync<UpdatePreferencesRequest, UserPreferencesDto>(
+                $"/api/v1/users/{_userId}/preferences", request);
+
+            Snackbar.Add("設定を保存しました", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "ユーザー設定の保存に失敗: {Message}", ex.Message);
+            Snackbar.Add("設定の保存に失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private record UserProfileDto(string Id, string Email, string Name, string? PhoneNumber, string Role, DateTime CreatedAt);
+    private record UserPreferencesDto(bool OrderConfirmationEmail, bool ShippingNotificationEmail, bool PromotionEmail, bool PointExpiryEmail, string? Language, string? Theme);
+    private record UpdatePreferencesRequest(bool OrderConfirmationEmail, bool ShippingNotificationEmail, bool PromotionEmail, bool PointExpiryEmail, string Language, string Theme);
+}

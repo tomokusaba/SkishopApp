@@ -1,0 +1,26 @@
+@page "/Error"
+@using System.Diagnostics
+
+<PageTitle>エラー - Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-16">
+    <MudStack AlignItems="AlignItems.Center" Spacing="6">
+        <MudIcon Icon="@Icons.Material.Filled.ErrorOutline"
+                 Color="Color.Error"
+                 Style="font-size: 6rem;" />
+        <MudText Typo="Typo.h4" Style="font-weight: 600;">
+            エラーが発生しました
+        </MudText>
+        <MudText Typo="Typo.body1" Align="Align.Center" Style="color: #616161;">
+            申し訳ございません。予期しないエラーが発生しました。<br />
+            しばらく経ってから再度お試しください。
+        </MudText>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Href="/"
+                   StartIcon="@Icons.Material.Filled.Home"
+                   Size="Size.Large">
+            トップページに戻る
+        </MudButton>
+    </MudStack>
+</MudContainer>

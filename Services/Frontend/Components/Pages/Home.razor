@@ -1,0 +1,385 @@
+@page "/"
+@attribute [StreamRendering]
+@inject IProductApiClient ProductApi
+@inject IAiApiClient AiApi
+@inject IHttpContextAccessor HttpContextAccessor
+@inject IStringLocalizer<SharedResources> L
+
+<PageTitle>@L["Home_Title"]</PageTitle>
+
+<HeadContent>
+    <meta name="description" content="@L["Home_Meta_Description"]" />
+    <meta property="og:title" content="@L["Home_Title"]" />
+    <meta property="og:description" content="@L["Home_Meta_OgDescription"]" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://skishop.example.com/" />
+    <link rel="preload" as="image" href="/images/hero-ski.svg" fetchpriority="high" />
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "WebSite",
+        "name": "Azure SkiShop",
+        "url": "https://skishop.example.com/",
+        "potentialAction": {
+            "@@type": "SearchAction",
+            "target": "https://skishop.example.com/products?keyword={search_term_string}",
+            "query-input": "required name=search_term_string"
+        }
+    }
+    </script>
+</HeadContent>
+
+<!-- ヒーローセクション -->
+<MudPaper Class="skishop-hero pa-0" Elevation="0" Square="true">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="py-16">
+        <MudGrid Justify="Justify.Center" Class="text-center">
+            <MudItem xs="12" md="8">
+                <MudIcon Icon="@Icons.Material.Filled.AcUnit"
+                         Style="font-size: 4rem; color: rgba(255,255,255,0.9);" />
+                <MudText Typo="Typo.h2"
+                         Class="mt-4 mb-2"
+                         Style="color: white; font-weight: 700; letter-spacing: 1px;">
+                    @L["Home_Hero_Title"]
+                </MudText>
+                <MudText Typo="Typo.h5"
+                         Class="mb-6"
+                         Style="color: rgba(255,255,255,0.85); font-weight: 300;">
+                    @L["Home_Hero_Subtitle"]
+                </MudText>
+                <MudStack Row="true" Justify="Justify.Center" Spacing="4" Class="mb-6">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Surface"
+                               Size="Size.Large"
+                               Href="/products"
+                               StartIcon="@Icons.Material.Filled.Store"
+                               Class="skishop-hero-btn">
+                        @L["Home_ViewProducts"]
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Size="Size.Large"
+                               Href="/ai-chat"
+                               Style="color: white; border-color: rgba(255,255,255,0.6);"
+                               Class="skishop-hero-btn">
+                        @L["Home_AiChat"]
+                    </MudButton>
+                </MudStack>
+                <Frontend.Components.Shared.SearchSuggest />
+            </MudItem>
+        </MudGrid>
+    </MudContainer>
+</MudPaper>
+
+<!-- 新着商品 -->
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-12">
+    <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-2" Style="font-weight: 600;">
+        @L["Home_NewArrivals"]
+    </MudText>
+    <MudText Typo="Typo.body1" Align="Align.Center" Class="mb-8" Style="color: #616161;">
+        @L["Home_NewArrivals_Sub"]
+    </MudText>
+    @if (_newArrivals.Count > 0)
+    {
+        <MudGrid Spacing="4">
+            @foreach (var (product, index) in _newArrivals.Select((p, i) => (p, i)))
+            {
+                <MudItem xs="12" sm="6" md="3">
+                    <Frontend.Components.Shared.ProductCard Product="product" LazyLoad="@(index >= 4)" />
+                </MudItem>
+            }
+        </MudGrid>
+    }
+    else
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    <div class="d-flex justify-center mt-6">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/products?sort=createdAt,desc" Size="Size.Large">
+            @L["Home_SeeMoreNewArrivals"]
+        </MudButton>
+    </div>
+</MudContainer>
+
+<!-- 人気商品 -->
+<MudPaper Elevation="0" Square="true" Style="background: #fafafa;">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="py-12">
+        <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-2" Style="font-weight: 600;">
+            @L["Home_Popular"]
+        </MudText>
+        <MudText Typo="Typo.body1" Align="Align.Center" Class="mb-8" Style="color: #616161;">
+            @L["Home_Popular_Sub"]
+        </MudText>
+        @if (_popularProducts.Count > 0)
+        {
+            <MudGrid Spacing="4">
+                @foreach (var product in _popularProducts)
+                {
+                    <MudItem xs="12" sm="6" md="3">
+                        <Frontend.Components.Shared.ProductCard Product="product" />
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+        else
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        <div class="d-flex justify-center mt-6">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/products?sort=salesCount,desc" Size="Size.Large">
+                @L["Home_SeeMoreRanking"]
+            </MudButton>
+        </div>
+    </MudContainer>
+</MudPaper>
+
+<!-- AI レコメンデーション: trending -->
+@if (_trendingRecommendations.Count > 0)
+{
+    <MudContainer MaxWidth="MaxWidth.Large" Class="py-12">
+        <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-2" Style="font-weight: 600;">
+            <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Style="vertical-align: middle;" /> @L["Home_Trending"]
+        </MudText>
+        <MudText Typo="Typo.body1" Align="Align.Center" Class="mb-8" Style="color: #616161;">
+            @L["Home_Trending_Sub"]
+        </MudText>
+        <MudGrid Spacing="4">
+            @foreach (var rec in _trendingRecommendations)
+            {
+                <MudItem xs="12" sm="6" md="3">
+                    <MudCard Elevation="2" Class="skishop-category-card" Style="height: 100%;">
+                        <MudCardMedia Image="@rec.ImageUrl" Height="200" Style="object-fit: contain; background: #f5f5f5;" />
+                        <MudCardContent>
+                            <MudLink Href="@($"/products/{rec.ProductId}")" Underline="Underline.None" Color="Color.Inherit">
+                                <MudText Typo="Typo.subtitle1" Style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">@rec.ProductName</MudText>
+                            </MudLink>
+                            <MudText Typo="Typo.h6" Color="Color.Primary" Class="mt-2">¥@rec.Price.ToString("N0")</MudText>
+                            <MudText Typo="Typo.caption" Style="color: #888;">@rec.Reason</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    </MudContainer>
+}
+
+<!-- AI レコメンデーション: seasonal -->
+@if (_seasonalRecommendations.Count > 0)
+{
+    <MudPaper Elevation="0" Square="true" Style="background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);">
+        <MudContainer MaxWidth="MaxWidth.Large" Class="py-12">
+            <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-2" Style="font-weight: 600;">
+                <MudIcon Icon="@Icons.Material.Filled.AcUnit" Style="vertical-align: middle;" /> @L["Home_Seasonal"]
+            </MudText>
+            <MudText Typo="Typo.body1" Align="Align.Center" Class="mb-8" Style="color: #37474F;">
+                @L["Home_Seasonal_Sub"]
+            </MudText>
+            <MudGrid Spacing="4">
+                @foreach (var rec in _seasonalRecommendations)
+                {
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudCard Elevation="2" Class="skishop-category-card" Style="height: 100%;">
+                            <MudCardMedia Image="@rec.ImageUrl" Height="200" Style="object-fit: contain; background: #f5f5f5;" />
+                            <MudCardContent>
+                                <MudLink Href="@($"/products/{rec.ProductId}")" Underline="Underline.None" Color="Color.Inherit">
+                                    <MudText Typo="Typo.subtitle1" Style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">@rec.ProductName</MudText>
+                                </MudLink>
+                                <MudText Typo="Typo.h6" Color="Color.Primary" Class="mt-2">¥@rec.Price.ToString("N0")</MudText>
+                                <MudText Typo="Typo.caption" Style="color: #888;">@rec.Reason</MudText>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudContainer>
+    </MudPaper>
+}
+
+<!-- AI レコメンデーション: personalized（認証時のみ） -->
+@if (_isAuthenticated && _personalizedRecommendations.Count > 0)
+{
+    <MudContainer MaxWidth="MaxWidth.Large" Class="py-12">
+        <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-2" Style="font-weight: 600;">
+            <MudIcon Icon="@Icons.Material.Filled.Person" Style="vertical-align: middle;" /> @L["Home_Personalized"]
+        </MudText>
+        <MudText Typo="Typo.body1" Align="Align.Center" Class="mb-8" Style="color: #616161;">
+            @L["Home_Personalized_Sub"]
+        </MudText>
+        <MudGrid Spacing="4">
+            @foreach (var rec in _personalizedRecommendations)
+            {
+                <MudItem xs="12" sm="6" md="3">
+                    <MudCard Elevation="2" Class="skishop-category-card" Style="height: 100%;">
+                        <MudCardMedia Image="@rec.ImageUrl" Height="200" Style="object-fit: contain; background: #f5f5f5;" />
+                        <MudCardContent>
+                            <MudLink Href="@($"/products/{rec.ProductId}")" Underline="Underline.None" Color="Color.Inherit">
+                                <MudText Typo="Typo.subtitle1" Style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">@rec.ProductName</MudText>
+                            </MudLink>
+                            <MudText Typo="Typo.h6" Color="Color.Primary" Class="mt-2">¥@rec.Price.ToString("N0")</MudText>
+                            <MudText Typo="Typo.caption" Style="color: #888;">@rec.Reason</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    </MudContainer>
+}
+
+<!-- カテゴリセクション -->
+<MudPaper Elevation="0" Square="true" Style="background: #fafafa;">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="py-12">
+        <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-8" Style="font-weight: 600;">
+            @L["Home_Categories"]
+        </MudText>
+        <MudGrid Spacing="4">
+            @foreach (var category in _categories)
+            {
+                <MudItem xs="12" sm="6" md="3">
+                    <MudCard Elevation="3" Class="skishop-category-card">
+                        <MudCardMedia Image="@category.ImageUrl" Height="200" />
+                        <MudCardContent>
+                            <MudText Typo="Typo.h6" Align="Align.Center">@category.Name</MudText>
+                        </MudCardContent>
+                        <MudCardActions Class="justify-center pb-4">
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       Href="@($"/products?keyword={Uri.EscapeDataString(category.Name)}")"
+                                       Size="Size.Small">
+                                @L["Home_ViewProducts"]
+                            </MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    </MudContainer>
+</MudPaper>
+
+<!-- 特徴セクション -->
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-12">
+    <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-8" Style="font-weight: 600;">
+        @L["Home_Features"]
+    </MudText>
+    <MudGrid Spacing="6">
+        <MudItem xs="12" md="4">
+            <MudStack AlignItems="AlignItems.Center" Spacing="3">
+                <MudIcon Icon="@Icons.Material.Filled.LocalShipping"
+                         Color="Color.Primary"
+                         Style="font-size: 3rem;" />
+                <MudText Typo="Typo.h6">@L["Home_Feature_Shipping"]</MudText>
+                <MudText Typo="Typo.body2" Align="Align.Center" Style="color: #616161;">
+                    @L["Home_Feature_Shipping_Desc"]
+                </MudText>
+            </MudStack>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudStack AlignItems="AlignItems.Center" Spacing="3">
+                <MudIcon Icon="@Icons.Material.Filled.Security"
+                         Color="Color.Primary"
+                         Style="font-size: 3rem;" />
+                <MudText Typo="Typo.h6">@L["Home_Feature_Quality"]</MudText>
+                <MudText Typo="Typo.body2" Align="Align.Center" Style="color: #616161;">
+                    @L["Home_Feature_Quality_Desc"]
+                </MudText>
+            </MudStack>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudStack AlignItems="AlignItems.Center" Spacing="3">
+                <MudIcon Icon="@Icons.Material.Filled.SmartToy"
+                         Color="Color.Primary"
+                         Style="font-size: 3rem;" />
+                <MudText Typo="Typo.h6">@L["Home_Feature_Ai"]</MudText>
+                <MudText Typo="Typo.body2" Align="Align.Center" Style="color: #616161;">
+                    @L["Home_Feature_Ai_Desc"]
+                </MudText>
+            </MudStack>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+<style>
+    .skishop-hero {
+        background: linear-gradient(135deg, #0D47A1 0%, #1565C0 40%, #1976D2 70%, #42A5F5 100%);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .skishop-hero::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -20%;
+        width: 60%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+        pointer-events: none;
+    }
+
+    .skishop-hero-btn {
+        border-radius: 28px !important;
+        padding: 12px 32px !important;
+        font-weight: 600 !important;
+        text-transform: none !important;
+    }
+
+    .skishop-category-card {
+        border-radius: 16px !important;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        overflow: hidden;
+    }
+
+    .skishop-category-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.15) !important;
+    }
+</style>
+
+@code {
+    private readonly record struct CategoryItem(string Name, string Slug, string ImageUrl);
+
+    private static readonly CategoryItem[] _categories =
+    [
+        new("スキー", "ski", "images/category-ski.svg"),
+        new("スノーボード", "snowboard", "images/category-snowboard.svg"),
+        new("ウェア", "wear", "images/category-wear.svg"),
+        new("アクセサリー", "accessory", "images/category-accessory.svg")
+    ];
+
+    private List<ProductDto> _newArrivals = [];
+    private List<ProductDto> _popularProducts = [];
+    private List<AiRecommendationDto> _trendingRecommendations = [];
+    private List<AiRecommendationDto> _seasonalRecommendations = [];
+    private List<AiRecommendationDto> _personalizedRecommendations = [];
+    private bool _isAuthenticated;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isAuthenticated = HttpContextAccessor.HttpContext?.User?.Identity?.IsAuthenticated ?? false;
+
+        var newArrivalsTask = SafeLoadAsync(() => ProductApi.GetNewArrivalsAsync(8));
+        var popularTask = SafeLoadAsync(() => ProductApi.GetPopularProductsAsync(8));
+        var trendingTask = SafeLoadAsync(() => AiApi.GetTrendingAsync(8));
+        var seasonalTask = SafeLoadAsync(() => AiApi.GetSeasonalAsync(8));
+        var personalizedTask = _isAuthenticated
+            ? SafeLoadAsync(() => AiApi.GetPersonalizedAsync(8))
+            : Task.FromResult<List<AiRecommendationDto>>([]);
+
+        await Task.WhenAll(newArrivalsTask, popularTask, trendingTask, seasonalTask, personalizedTask);
+
+        _newArrivals = await newArrivalsTask;
+        _popularProducts = await popularTask;
+        _trendingRecommendations = await trendingTask;
+        _seasonalRecommendations = await seasonalTask;
+        _personalizedRecommendations = await personalizedTask;
+    }
+
+    private static async Task<List<T>> SafeLoadAsync<T>(Func<Task<List<T>>> loader)
+    {
+        try
+        {
+            return await loader();
+        }
+        catch
+        {
+            return [];
+        }
+    }
+}

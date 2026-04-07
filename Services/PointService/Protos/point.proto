@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+option csharp_namespace = "PointService.Protos";
+
+package skishop.point.v1;
+
+service PointGrpc {
+  // Saga ステップ 4: ポイント仮消費（注文確定時）
+  rpc ReservePoints (ReservePointsRequest) returns (ReservePointsResponse);
+
+  // Saga 補償: ポイント仮消費解放（注文キャンセル/失敗時）
+  rpc ReleasePoints (ReleasePointsRequest) returns (ReleasePointsResponse);
+
+  // Saga ステップ 7: ポイント確定付与（注文完了時）
+  rpc AwardPoints (AwardPointsRequest) returns (AwardPointsResponse);
+
+  // ポイント消費確定（仮消費 → 確定消費に変更）
+  rpc ConfirmPoints (ConfirmPointsRequest) returns (ConfirmPointsResponse);
+
+  // ポイント残高照会
+  rpc GetBalance (GetBalanceRequest) returns (GetBalanceResponse);
+}
+
+message ReservePointsRequest {
+  string user_id = 1;
+  string order_id = 2;
+  int32 points = 3;
+  string idempotency_key = 4;
+}
+
+message ReservePointsResponse {
+  bool success = 1;
+  int32 remaining_balance = 2;
+  string error_message = 3;
+}
+
+message ReleasePointsRequest {
+  string user_id = 1;
+  string order_id = 2;
+  string idempotency_key = 3;
+}
+
+message ReleasePointsResponse {
+  bool success = 1;
+  int32 released_points = 2;
+  string error_message = 3;
+}
+
+message AwardPointsRequest {
+  string user_id = 1;
+  string order_id = 2;
+  int64 order_amount = 3;
+  string idempotency_key = 4;
+}
+
+message AwardPointsResponse {
+  bool success = 1;
+  int32 awarded_points = 2;
+  int32 new_balance = 3;
+  string error_message = 4;
+}
+
+message ConfirmPointsRequest {
+  string user_id = 1;
+  string order_id = 2;
+  string idempotency_key = 3;
+}
+
+message ConfirmPointsResponse {
+  bool success = 1;
+  int32 confirmed_points = 2;
+  int32 new_balance = 3;
+  string error_message = 4;
+}
+
+message GetBalanceRequest {
+  string user_id = 1;
+}
+
+message GetBalanceResponse {
+  int32 available_points = 1;
+  int32 pending_points = 2;
+  int32 total_earned = 3;
+  int32 total_spent = 4;
+}

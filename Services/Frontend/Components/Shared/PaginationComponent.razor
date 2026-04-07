@@ -1,0 +1,88 @@
+@namespace Frontend.Components.Shared
+@using Frontend.Models
+
+@* §16.4 準拠 — MudBlazor ベースのページネーション共通コンポーネント *@
+
+@typeparam T
+
+@if (Data is not null && Data.TotalElements > 0)
+{
+    <nav aria-label="ページネーション">
+        <div class="d-flex align-center justify-space-between flex-wrap gap-2 mt-4">
+            <MudText Typo="Typo.body2" Color="Color.Default" aria-live="polite">
+                全 @Data.TotalElements 件中 @(Data.Page * Data.Size + 1)〜@(Math.Min((Data.Page + 1) * Data.Size, Data.TotalElements)) 件
+            </MudText>
+
+            <div class="d-flex align-center gap-2">
+                <MudIconButton
+                    Icon="@Icons.Material.Filled.ChevronLeft"
+                    Disabled="@(!Data.HasPrevious)"
+                    OnClick="@(() => OnPageChanged.InvokeAsync(Data.Page - 1))"
+                    aria-label="前のページ"
+                    Size="Size.Small" />
+
+                @for (var i = StartPage; i <= EndPage; i++)
+                {
+                    var pageIndex = i;
+                    <MudButton
+                        Variant="@(pageIndex == Data.Page ? Variant.Filled : Variant.Text)"
+                        Color="@(pageIndex == Data.Page ? Color.Primary : Color.Default)"
+                        Size="Size.Small"
+                        OnClick="@(() => OnPageChanged.InvokeAsync(pageIndex))"
+                        aria-current="@(pageIndex == Data.Page ? "page" : null)">
+                        @(pageIndex + 1)
+                    </MudButton>
+                }
+
+                <MudIconButton
+                    Icon="@Icons.Material.Filled.ChevronRight"
+                    Disabled="@(!Data.HasNext)"
+                    OnClick="@(() => OnPageChanged.InvokeAsync(Data.Page + 1))"
+                    aria-label="次のページ"
+                    Size="Size.Small" />
+            </div>
+
+            <MudSelect T="int"
+                       Value="@Data.Size"
+                       ValueChanged="@(v => OnPageSizeChanged.InvokeAsync(v))"
+                       Label="表示件数"
+                       Dense="true"
+                       Style="max-width: 120px;"
+                       aria-label="1ページあたりの表示件数">
+                @foreach (var size in PageSizeOptions)
+                {
+                    <MudSelectItem T="int" Value="@size">@size 件</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+    </nav>
+}
+
+@code {
+    [Parameter] public PaginatedResult<T>? Data { get; set; }
+    [Parameter] public EventCallback<int> OnPageChanged { get; set; }
+    [Parameter] public EventCallback<int> OnPageSizeChanged { get; set; }
+    [Parameter] public int[] PageSizeOptions { get; set; } = [10, 20, 50, 100];
+    [Parameter] public int MaxVisiblePages { get; set; } = 5;
+
+    private int StartPage
+    {
+        get
+        {
+            if (Data is null) return 0;
+            var half = MaxVisiblePages / 2;
+            var start = Math.Max(0, Data.Page - half);
+            var end = Math.Min(Data.TotalPages - 1, start + MaxVisiblePages - 1);
+            return Math.Max(0, end - MaxVisiblePages + 1);
+        }
+    }
+
+    private int EndPage
+    {
+        get
+        {
+            if (Data is null) return 0;
+            return Math.Min(Data.TotalPages - 1, StartPage + MaxVisiblePages - 1);
+        }
+    }
+}

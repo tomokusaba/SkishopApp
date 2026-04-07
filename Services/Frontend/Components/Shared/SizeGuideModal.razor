@@ -1,0 +1,59 @@
+@using Frontend.Services
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.Straighten" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">サイズガイド - @(SizeGuide?.CategoryName ?? "カテゴリ")</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (SizeGuide is not null && SizeGuide.Rows.Count > 0)
+        {
+            <MudText Typo="Typo.body2" Class="mb-3">
+                サイズ選びの参考にしてください。実際のサイズは商品により若干異なる場合があります。
+            </MudText>
+            <MudSimpleTable Dense="true" Hover="true" Bordered="true"
+                            Style="overflow-x: auto;" role="table" aria-label="サイズガイド表">
+                <thead>
+                    <tr>
+                        <th>サイズ</th>
+                        <th>胸囲 (cm)</th>
+                        <th>ウエスト (cm)</th>
+                        <th>ヒップ (cm)</th>
+                        <th>身長 (cm)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in SizeGuide.Rows)
+                    {
+                        <tr>
+                            <td><strong>@row.Size</strong></td>
+                            <td>@row.Chest</td>
+                            <td>@row.Waist</td>
+                            <td>@row.Hips</td>
+                            <td>@row.Height</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info">このカテゴリのサイズガイドは現在準備中です。</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">閉じる</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public SizeGuideDto? SizeGuide { get; set; }
+
+    private void Cancel() => MudDialog.Cancel();
+}

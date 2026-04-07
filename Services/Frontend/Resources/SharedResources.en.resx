@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" msdata:Ordinal="0" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute name="space" use="optional" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>1.3</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <!-- ========== Nav ========== -->
+  <data name="Nav_Home" xml:space="preserve"><value>Home</value></data>
+  <data name="Nav_Products" xml:space="preserve"><value>All Products</value></data>
+  <data name="Nav_Cart" xml:space="preserve"><value>Cart</value></data>
+  <data name="Nav_Login" xml:space="preserve"><value>Login</value></data>
+  <data name="Nav_Register" xml:space="preserve"><value>Register</value></data>
+  <data name="Nav_MyPage" xml:space="preserve"><value>My Page</value></data>
+  <data name="Nav_Orders" xml:space="preserve"><value>Order History</value></data>
+  <data name="Nav_Points" xml:space="preserve"><value>Points</value></data>
+  <data name="Nav_Coupons" xml:space="preserve"><value>Coupons</value></data>
+  <data name="Nav_Wishlists" xml:space="preserve"><value>Wishlists</value></data>
+  <data name="Nav_Logout" xml:space="preserve"><value>Logout</value></data>
+  <data name="Nav_Search" xml:space="preserve"><value>Search products...</value></data>
+  <data name="Nav_Category" xml:space="preserve"><value>Categories</value></data>
+  <data name="Nav_CategoryMenu" xml:space="preserve"><value>Product category menu</value></data>
+  <data name="Nav_Ski" xml:space="preserve"><value>Ski</value></data>
+  <data name="Nav_Snowboard" xml:space="preserve"><value>Snowboard</value></data>
+  <data name="Nav_Wear" xml:space="preserve"><value>Wear</value></data>
+  <data name="Nav_Accessory" xml:space="preserve"><value>Accessories</value></data>
+  <data name="Nav_Account" xml:space="preserve"><value>Account</value></data>
+  <data name="Nav_MainNavigation" xml:space="preserve"><value>Main navigation</value></data>
+
+  <!-- ========== Home ========== -->
+  <data name="Home_Title" xml:space="preserve"><value>Azure SkiShop - Premium Ski &amp; Snowboard Gear</value></data>
+  <data name="Home_Hero_Title" xml:space="preserve"><value>Welcome to Azure SkiShop</value></data>
+  <data name="Home_Hero_Subtitle" xml:space="preserve"><value>Premium ski &amp; snowboard gear, delivered to you</value></data>
+  <data name="Home_Featured" xml:space="preserve"><value>Featured Products</value></data>
+  <data name="Home_NewArrivals" xml:space="preserve"><value>New Arrivals</value></data>
+  <data name="Home_NewArrivals_Sub" xml:space="preserve"><value>Check out the latest items</value></data>
+  <data name="Home_AiRecommendations" xml:space="preserve"><value>AI Recommendations</value></data>
+  <data name="Home_ViewAll" xml:space="preserve"><value>View All</value></data>
+  <data name="Home_ViewProducts" xml:space="preserve"><value>Browse Products</value></data>
+  <data name="Home_AiChat" xml:space="preserve"><value>Start AI Chat</value></data>
+  <data name="Home_Popular" xml:space="preserve"><value>Best Sellers</value></data>
+  <data name="Home_Popular_Sub" xml:space="preserve"><value>Top-selling items</value></data>
+  <data name="Home_Trending" xml:space="preserve"><value>Trending</value></data>
+  <data name="Home_Trending_Sub" xml:space="preserve"><value>Trending items selected by AI</value></data>
+  <data name="Home_Seasonal" xml:space="preserve"><value>Seasonal Picks</value></data>
+  <data name="Home_Seasonal_Sub" xml:space="preserve"><value>Perfect items for this season</value></data>
+  <data name="Home_Personalized" xml:space="preserve"><value>Recommended for You</value></data>
+  <data name="Home_Personalized_Sub" xml:space="preserve"><value>AI-curated picks based on your preferences</value></data>
+  <data name="Home_Categories" xml:space="preserve"><value>Shop by Category</value></data>
+  <data name="Home_Features" xml:space="preserve"><value>Why Azure SkiShop</value></data>
+  <data name="Home_Feature_Shipping" xml:space="preserve"><value>Free Shipping Nationwide</value></data>
+  <data name="Home_Feature_Shipping_Desc" xml:space="preserve"><value>Free shipping on orders over ¥10,000</value></data>
+  <data name="Home_Feature_Quality" xml:space="preserve"><value>Quality Guaranteed</value></data>
+  <data name="Home_Feature_Quality_Desc" xml:space="preserve"><value>All products are genuine with return guarantee</value></data>
+  <data name="Home_Feature_Ai" xml:space="preserve"><value>AI Shopping Assistant</value></data>
+  <data name="Home_Feature_Ai_Desc" xml:space="preserve"><value>AI helps you find the perfect gear</value></data>
+  <data name="Home_SeeMoreNewArrivals" xml:space="preserve"><value>See More New Arrivals</value></data>
+  <data name="Home_SeeMoreRanking" xml:space="preserve"><value>See Full Rankings</value></data>
+  <data name="Home_Meta_Description" xml:space="preserve"><value>Azure SkiShop is a premium online store for ski and snowboard gear. From the latest models to great deals, AI recommends the best products for you.</value></data>
+  <data name="Home_Meta_OgDescription" xml:space="preserve"><value>Premium ski &amp; snowboard gear online store. AI-powered recommendations for you.</value></data>
+
+  <!-- ========== Products ========== -->
+  <data name="Products_Title" xml:space="preserve"><value>Products</value></data>
+  <data name="Products_Search" xml:space="preserve"><value>Search Products</value></data>
+  <data name="Products_Sort" xml:space="preserve"><value>Sort By</value></data>
+  <data name="Products_Filter" xml:space="preserve"><value>Filter</value></data>
+  <data name="Products_Category" xml:space="preserve"><value>Category</value></data>
+  <data name="Products_Price" xml:space="preserve"><value>Price</value></data>
+  <data name="Products_AddToCart" xml:space="preserve"><value>Add to Cart</value></data>
+  <data name="Products_OutOfStock" xml:space="preserve"><value>Out of Stock</value></data>
+  <data name="Products_InStock" xml:space="preserve"><value>In Stock</value></data>
+  <data name="Products_LowStock" xml:space="preserve"><value>Low Stock</value></data>
+  <data name="Products_Reviews" xml:space="preserve"><value>Customer Reviews</value></data>
+  <data name="Products_WriteReview" xml:space="preserve"><value>Write a Review</value></data>
+  <data name="Products_SizeGuide" xml:space="preserve"><value>Size Guide</value></data>
+  <data name="Products_Description" xml:space="preserve"><value>Description</value></data>
+  <data name="Products_Specifications" xml:space="preserve"><value>Specifications</value></data>
+  <data name="Products_Detail" xml:space="preserve"><value>Product Detail</value></data>
+  <data name="Products_Size" xml:space="preserve"><value>Size</value></data>
+  <data name="Products_Color" xml:space="preserve"><value>Color</value></data>
+  <data name="Products_Quantity" xml:space="preserve"><value>Quantity</value></data>
+  <data name="Products_TaxIncluded" xml:space="preserve"><value>(tax incl.)</value></data>
+  <data name="Products_NoReviews" xml:space="preserve"><value>No reviews yet.</value></data>
+  <data name="Products_Similar" xml:space="preserve"><value>Similar Products</value></data>
+  <data name="Products_Similar_Sub" xml:space="preserve"><value>AI-recommended similar products for you</value></data>
+  <data name="Products_FrequentlyBought" xml:space="preserve"><value>Frequently Bought Together</value></data>
+  <data name="Products_SameCategory" xml:space="preserve"><value>Products in Same Category</value></data>
+  <data name="Products_ReviewCount" xml:space="preserve"><value>reviews</value></data>
+  <data name="Products_Helpful" xml:space="preserve"><value>Helpful</value></data>
+  <data name="Products_NotHelpful" xml:space="preserve"><value>Not helpful</value></data>
+
+  <!-- ========== Cart ========== -->
+  <data name="Cart_Title" xml:space="preserve"><value>Shopping Cart</value></data>
+  <data name="Cart_Empty" xml:space="preserve"><value>Your cart is empty</value></data>
+  <data name="Cart_Total" xml:space="preserve"><value>Total</value></data>
+  <data name="Cart_Subtotal" xml:space="preserve"><value>Subtotal</value></data>
+  <data name="Cart_Tax" xml:space="preserve"><value>Tax</value></data>
+  <data name="Cart_Shipping" xml:space="preserve"><value>Shipping</value></data>
+  <data name="Cart_Checkout" xml:space="preserve"><value>Proceed to Checkout</value></data>
+  <data name="Cart_Remove" xml:space="preserve"><value>Remove</value></data>
+  <data name="Cart_Quantity" xml:space="preserve"><value>Quantity</value></data>
+  <data name="Cart_Update" xml:space="preserve"><value>Update</value></data>
+  <data name="Cart_CouponApply" xml:space="preserve"><value>Apply Coupon</value></data>
+  <data name="Cart_CouponCode" xml:space="preserve"><value>Coupon Code</value></data>
+  <data name="Cart_ItemCount" xml:space="preserve"><value>items</value></data>
+
+  <!-- ========== Checkout ========== -->
+  <data name="Checkout_Title" xml:space="preserve"><value>Checkout</value></data>
+  <data name="Checkout_Shipping" xml:space="preserve"><value>Shipping Information</value></data>
+  <data name="Checkout_Payment" xml:space="preserve"><value>Payment Method</value></data>
+  <data name="Checkout_Confirm" xml:space="preserve"><value>Order Confirmation</value></data>
+  <data name="Checkout_Complete" xml:space="preserve"><value>Order Complete</value></data>
+  <data name="Checkout_PlaceOrder" xml:space="preserve"><value>Place Order</value></data>
+  <data name="Checkout_Back" xml:space="preserve"><value>Back</value></data>
+  <data name="Checkout_Next" xml:space="preserve"><value>Next</value></data>
+  <data name="Checkout_Processing" xml:space="preserve"><value>Processing...</value></data>
+  <data name="Checkout_OrderNumber" xml:space="preserve"><value>Order Number</value></data>
+  <data name="Checkout_ThankYou" xml:space="preserve"><value>Thank you for your order</value></data>
+
+  <!-- ========== Auth ========== -->
+  <data name="Auth_Login" xml:space="preserve"><value>Login</value></data>
+  <data name="Auth_Register" xml:space="preserve"><value>Register</value></data>
+  <data name="Auth_Email" xml:space="preserve"><value>Email Address</value></data>
+  <data name="Auth_Password" xml:space="preserve"><value>Password</value></data>
+  <data name="Auth_ConfirmPassword" xml:space="preserve"><value>Confirm Password</value></data>
+  <data name="Auth_ForgotPassword" xml:space="preserve"><value>Forgot your password?</value></data>
+  <data name="Auth_ResetPassword" xml:space="preserve"><value>Reset Password</value></data>
+  <data name="Auth_Mfa" xml:space="preserve"><value>Two-Factor Authentication</value></data>
+  <data name="Auth_Logout" xml:space="preserve"><value>Logout</value></data>
+  <data name="Auth_RememberMe" xml:space="preserve"><value>Remember me</value></data>
+
+  <!-- ========== MyPage ========== -->
+  <data name="MyPage_Title" xml:space="preserve"><value>My Page</value></data>
+  <data name="MyPage_Profile" xml:space="preserve"><value>Profile</value></data>
+  <data name="MyPage_Orders" xml:space="preserve"><value>Order History</value></data>
+  <data name="MyPage_Addresses" xml:space="preserve"><value>Shipping Addresses</value></data>
+  <data name="MyPage_Password" xml:space="preserve"><value>Change Password</value></data>
+  <data name="MyPage_Privacy" xml:space="preserve"><value>Privacy Settings</value></data>
+  <data name="MyPage_Settings" xml:space="preserve"><value>Settings</value></data>
+  <data name="MyPage_Activities" xml:space="preserve"><value>Activities</value></data>
+  <data name="MyPage_DataExport" xml:space="preserve"><value>Data Export</value></data>
+  <data name="MyPage_DeleteAccount" xml:space="preserve"><value>Delete Account</value></data>
+
+  <!-- ========== Orders ========== -->
+  <data name="Orders_Title" xml:space="preserve"><value>Order History</value></data>
+  <data name="Orders_Detail" xml:space="preserve"><value>Order Details</value></data>
+  <data name="Orders_Status" xml:space="preserve"><value>Order Status</value></data>
+  <data name="Orders_Cancel" xml:space="preserve"><value>Cancel Order</value></data>
+  <data name="Orders_Return" xml:space="preserve"><value>Return</value></data>
+  <data name="Orders_Track" xml:space="preserve"><value>Track Delivery</value></data>
+  <data name="Orders_Reorder" xml:space="preserve"><value>Reorder</value></data>
+  <data name="Orders_Date" xml:space="preserve"><value>Order Date</value></data>
+  <data name="Orders_Total" xml:space="preserve"><value>Total Amount</value></data>
+
+  <!-- ========== Points ========== -->
+  <data name="Points_Title" xml:space="preserve"><value>Points</value></data>
+  <data name="Points_Balance" xml:space="preserve"><value>Points Balance</value></data>
+  <data name="Points_History" xml:space="preserve"><value>Points History</value></data>
+  <data name="Points_Tier" xml:space="preserve"><value>Membership Tier</value></data>
+  <data name="Points_Expiry" xml:space="preserve"><value>Expiry Date</value></data>
+  <data name="Points_Earned" xml:space="preserve"><value>Earned</value></data>
+  <data name="Points_Used" xml:space="preserve"><value>Used</value></data>
+
+  <!-- ========== Coupons ========== -->
+  <data name="Coupons_Title" xml:space="preserve"><value>Coupons</value></data>
+  <data name="Coupons_Available" xml:space="preserve"><value>Available Coupons</value></data>
+  <data name="Coupons_MyCoupons" xml:space="preserve"><value>My Coupons</value></data>
+  <data name="Coupons_Apply" xml:space="preserve"><value>Apply Coupon</value></data>
+  <data name="Coupons_Expired" xml:space="preserve"><value>Expired</value></data>
+  <data name="Coupons_Acquire" xml:space="preserve"><value>Get Coupon</value></data>
+
+  <!-- ========== Wishlists ========== -->
+  <data name="Wishlists_Title" xml:space="preserve"><value>Wishlists</value></data>
+  <data name="Wishlists_Create" xml:space="preserve"><value>Create New List</value></data>
+  <data name="Wishlists_AddToCart" xml:space="preserve"><value>Add to Cart</value></data>
+  <data name="Wishlists_Remove" xml:space="preserve"><value>Remove from List</value></data>
+  <data name="Wishlists_Share" xml:space="preserve"><value>Share List</value></data>
+
+  <!-- ========== Common ========== -->
+  <data name="Common_Save" xml:space="preserve"><value>Save</value></data>
+  <data name="Common_Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="Common_Delete" xml:space="preserve"><value>Delete</value></data>
+  <data name="Common_Edit" xml:space="preserve"><value>Edit</value></data>
+  <data name="Common_Back" xml:space="preserve"><value>Back</value></data>
+  <data name="Common_Next" xml:space="preserve"><value>Next</value></data>
+  <data name="Common_Submit" xml:space="preserve"><value>Submit</value></data>
+  <data name="Common_Loading" xml:space="preserve"><value>Loading...</value></data>
+  <data name="Common_Error" xml:space="preserve"><value>An error occurred</value></data>
+  <data name="Common_Success" xml:space="preserve"><value>Success</value></data>
+  <data name="Common_Confirm" xml:space="preserve"><value>Confirm</value></data>
+  <data name="Common_Close" xml:space="preserve"><value>Close</value></data>
+  <data name="Common_Search" xml:space="preserve"><value>Search</value></data>
+  <data name="Common_NoResults" xml:space="preserve"><value>No results found</value></data>
+  <data name="Common_Page" xml:space="preserve"><value>Page</value></data>
+  <data name="Common_Of" xml:space="preserve"><value>of</value></data>
+  <data name="Common_Required" xml:space="preserve"><value>Required</value></data>
+  <data name="Common_Yes" xml:space="preserve"><value>Yes</value></data>
+  <data name="Common_No" xml:space="preserve"><value>No</value></data>
+  <data name="Common_CartItems" xml:space="preserve"><value>Cart ({0} items)</value></data>
+
+  <!-- ========== Error ========== -->
+  <data name="Error_NotFound" xml:space="preserve"><value>Page not found</value></data>
+  <data name="Error_Unauthorized" xml:space="preserve"><value>Authentication required</value></data>
+  <data name="Error_Forbidden" xml:space="preserve"><value>Access denied</value></data>
+  <data name="Error_ServerError" xml:space="preserve"><value>Server error occurred</value></data>
+  <data name="Error_Validation" xml:space="preserve"><value>Validation error</value></data>
+  <data name="Error_Network" xml:space="preserve"><value>Network error occurred</value></data>
+
+  <!-- ========== Legal ========== -->
+  <data name="Legal_Tokushoho" xml:space="preserve"><value>Specified Commercial Transactions Act</value></data>
+  <data name="Legal_Privacy" xml:space="preserve"><value>Privacy Policy</value></data>
+  <data name="Legal_Terms" xml:space="preserve"><value>Terms of Service</value></data>
+
+  <!-- ========== Footer ========== -->
+  <data name="Footer_Company" xml:space="preserve"><value>Azure SkiShop</value></data>
+  <data name="Footer_Company_Desc" xml:space="preserve"><value>Premium ski &amp; snowboard gear delivered to you</value></data>
+  <data name="Footer_Support" xml:space="preserve"><value>Contact Us</value></data>
+  <data name="Footer_Legal" xml:space="preserve"><value>Links</value></data>
+  <data name="Footer_Copyright" xml:space="preserve"><value>© 2026 Azure SkiShop. All rights reserved.</value></data>
+
+  <!-- ========== Cookie ========== -->
+  <data name="Cookie_Title" xml:space="preserve"><value>Cookie Usage</value></data>
+  <data name="Cookie_Description" xml:space="preserve"><value>We use cookies on this site.</value></data>
+  <data name="Cookie_Detail" xml:space="preserve"><value>Learn more</value></data>
+  <data name="Cookie_AcceptAll" xml:space="preserve"><value>Accept All</value></data>
+  <data name="Cookie_RejectAll" xml:space="preserve"><value>Essential Only</value></data>
+  <data name="Cookie_Customize" xml:space="preserve"><value>Save Settings</value></data>
+  <data name="Cookie_Marketing" xml:space="preserve"><value>Marketing Cookies</value></data>
+  <data name="Cookie_Marketing_Desc" xml:space="preserve"><value>Used to personalize ads and promotions.</value></data>
+  <data name="Cookie_Marketing_Label" xml:space="preserve"><value>Enable marketing cookies</value></data>
+  <data name="Cookie_Analytics" xml:space="preserve"><value>Analytics Cookies</value></data>
+  <data name="Cookie_Analytics_Desc" xml:space="preserve"><value>Used to analyze site usage and improve our services.</value></data>
+  <data name="Cookie_Analytics_Label" xml:space="preserve"><value>Enable analytics cookies</value></data>
+  <data name="Cookie_Personalization" xml:space="preserve"><value>Personalization Cookies</value></data>
+  <data name="Cookie_Personalization_Desc" xml:space="preserve"><value>Used for product recommendations based on your preferences.</value></data>
+  <data name="Cookie_Personalization_Label" xml:space="preserve"><value>Enable personalization cookies</value></data>
+  <data name="Cookie_ThirdParty" xml:space="preserve"><value>Third-Party Cookies</value></data>
+  <data name="Cookie_ThirdParty_Desc" xml:space="preserve"><value>Used for external service integrations (social sharing, etc.).</value></data>
+  <data name="Cookie_ThirdParty_Label" xml:space="preserve"><value>Enable third-party cookies</value></data>
+  <data name="Cookie_Settings" xml:space="preserve"><value>Cookie Settings</value></data>
+
+  <!-- ========== Ai ========== -->
+  <data name="Ai_Chat_Title" xml:space="preserve"><value>AI Chat Support</value></data>
+  <data name="Ai_Chat_Placeholder" xml:space="preserve"><value>Ask a question...</value></data>
+  <data name="Ai_Chat_Send" xml:space="preserve"><value>Send</value></data>
+  <data name="Ai_Chat_Escalate" xml:space="preserve"><value>Connect to Agent</value></data>
+
+  <!-- ========== SkipLink / Accessibility ========== -->
+  <data name="Accessibility_SkipToContent" xml:space="preserve"><value>Skip to main content</value></data>
+  <data name="Accessibility_HomeLink" xml:space="preserve"><value>Home</value></data>
+
+  <!-- ========== Breadcrumbs ========== -->
+  <data name="Breadcrumb_Home" xml:space="preserve"><value>Home</value></data>
+  <data name="Breadcrumb_Products" xml:space="preserve"><value>Products</value></data>
+
+  <!-- ========== Language ========== -->
+  <data name="Language_Switch" xml:space="preserve"><value>Language</value></data>
+  <data name="Language_Ja" xml:space="preserve"><value>日本語</value></data>
+  <data name="Language_En" xml:space="preserve"><value>English</value></data>
+
+  <!-- ========== SEO / Sitemap ========== -->
+  <data name="Seo_SiteName" xml:space="preserve"><value>Azure SkiShop</value></data>
+  <data name="Seo_Home_Title" xml:space="preserve"><value>SkiShop - Ski Gear Online Store</value></data>
+</root>

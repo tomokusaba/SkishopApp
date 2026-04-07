@@ -1,0 +1,192 @@
+@page "/checkout/confirm"
+@rendermode @(RenderMode.InteractiveServer)
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@inject ICartApiClient CartApi
+@inject IOrderApiClient OrderApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject ILogger<Confirm> Logger
+
+<PageTitle>注文確認 - チェックアウト - Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <Frontend.Components.Shared.StepIndicator CurrentStep="4" />
+
+    <MudText Typo="Typo.h5" Class="mb-4" Style="font-weight: 700;">注文確認</MudText>
+
+    @if (_isLoading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_cart is not null)
+    {
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                @* Order items *@
+                <MudPaper Elevation="2" Class="pa-4 mb-4" Style="border-radius: 12px;">
+                    <MudText Typo="Typo.subtitle1" Class="mb-3" Style="font-weight: 600;">注文商品</MudText>
+                    <MudTable Items="@_cart.Items" Dense="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>商品名</MudTh>
+                            <MudTh>数量</MudTh>
+                            <MudTh>単価</MudTh>
+                            <MudTh Style="text-align: right;">小計</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.ProductName</MudTd>
+                            <MudTd>@context.Quantity</MudTd>
+                            <MudTd>¥@context.UnitPrice.ToString("N0")</MudTd>
+                            <MudTd Style="text-align: right;">¥@context.Subtotal.ToString("N0")</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+
+                @* Shipping address *@
+                <MudPaper Elevation="2" Class="pa-4 mb-4" Style="border-radius: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">配送先</MudText>
+                        <MudLink Href="/checkout/shipping" Underline="Underline.Always">変更</MudLink>
+                    </div>
+                    <MudText Typo="Typo.body2" Class="mt-2">（配送先情報はセッションから取得されます）</MudText>
+                </MudPaper>
+
+                @* Payment method *@
+                <MudPaper Elevation="2" Class="pa-4 mb-4" Style="border-radius: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">お支払い方法</MudText>
+                        <MudLink Href="/checkout/payment" Underline="Underline.Always">変更</MudLink>
+                    </div>
+                    <MudText Typo="Typo.body2" Class="mt-2">クレジットカード（Stripe）</MudText>
+                </MudPaper>
+
+                @* Coupon/Points *@
+                <MudPaper Elevation="2" Class="pa-4 mb-4" Style="border-radius: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">クーポン・ポイント</MudText>
+                        <MudLink Href="/checkout/payment" Underline="Underline.Always">変更</MudLink>
+                    </div>
+                    @if (!string.IsNullOrEmpty(_cart.AppliedCouponCode))
+                    {
+                        <MudText Typo="Typo.body2" Class="mt-2">クーポン: @_cart.AppliedCouponCode</MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                @* Summary *@
+                <MudPaper Elevation="2" Class="pa-4" Style="border-radius: 12px;">
+                    <MudText Typo="Typo.subtitle1" Class="mb-3" Style="font-weight: 600;">金額サマリー</MudText>
+                    <div class="summary-row"><span>小計（税抜）</span><span>¥@_cart.Subtotal.ToString("N0")</span></div>
+                    <div class="summary-row"><span>消費税（10%）</span><span>¥@_cart.Tax.ToString("N0")</span></div>
+                    <div class="summary-row"><span>送料</span><span>@(_cart.ShippingFee == 0 ? "無料" : $"¥{_cart.ShippingFee:N0}")</span></div>
+                    @if (_cart.CouponDiscount > 0)
+                    {
+                        <div class="summary-row" style="color: #d32f2f;"><span>クーポン割引</span><span>-¥@_cart.CouponDiscount.ToString("N0")</span></div>
+                    }
+                    @if (_cart.PointDiscount > 0)
+                    {
+                        <div class="summary-row" style="color: #d32f2f;"><span>ポイント使用</span><span>-@_cart.PointDiscount.ToString("N0") pt</span></div>
+                    }
+                    <MudDivider Class="my-3" />
+                    <div class="summary-row total"><span>合計（税込）</span><span>¥@_cart.Total.ToString("N0")</span></div>
+                    <MudDivider Class="my-3" />
+                    @if (_cart.EarnablePoints > 0)
+                    {
+                        <div class="summary-row points"><span>獲得予定ポイント</span><span>@_cart.EarnablePoints pt</span></div>
+                    }
+
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                               Size="Size.Large" Class="mt-4"
+                               Disabled="@_isSubmitting"
+                               OnClick="PlaceOrderAsync"
+                               StartIcon="@Icons.Material.Filled.Lock">
+                        @if (_isSubmitting)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Default" Class="mr-2" />
+                            @:処理中...
+                        }
+                        else
+                        {
+                            @:¥@_cart.Total.ToString("N0") で注文を確定する
+                        }
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Text" Color="Color.Default" FullWidth="true" Class="mt-2"
+                               Href="/cart" Disabled="@_isSubmitting">
+                        カートに戻る
+                    </MudButton>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+<style>
+    .summary-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 0.95rem; }
+    .summary-row.total { font-weight: 700; font-size: 1.2rem; color: #0D47A1; }
+    .summary-row.points { color: #f57c00; font-size: 0.9rem; }
+</style>
+
+@code {
+    private CartDto? _cart;
+    private bool _isLoading = true;
+    private bool _isSubmitting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _cart = await CartApi.GetCartAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "注文確認画面読み込みエラー");
+            Snackbar.Add("データの読み込みに失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task PlaceOrderAsync()
+    {
+        if (_cart is null) return;
+
+        _isSubmitting = true;
+        try
+        {
+            var orderRequest = new CreateOrderRequest(
+                AddressId: "session-address",
+                ShippingMethod: "standard",
+                CouponCode: _cart.AppliedCouponCode,
+                PointsToUse: (int)_cart.PointDiscount,
+                Items: _cart.Items.Select(i => new OrderItemRequest(i.ProductId, i.Quantity, i.Size, i.Color)).ToList());
+
+            var response = await OrderApi.CreateOrderAsync(orderRequest);
+
+            if (response?.CheckoutSessionUrl is not null)
+            {
+                Navigation.NavigateTo(response.CheckoutSessionUrl, forceLoad: true);
+            }
+            else if (response?.OrderId is not null)
+            {
+                Navigation.NavigateTo($"/checkout/complete?orderId={response.OrderId}");
+            }
+            else
+            {
+                Snackbar.Add("注文の作成に失敗しました", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "注文作成エラー");
+            Snackbar.Add("注文の作成中にエラーが発生しました", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+}

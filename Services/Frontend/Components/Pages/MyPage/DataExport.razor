@@ -1,0 +1,258 @@
+@page "/mypage/data-export"
+@rendermode @(RenderMode.InteractiveServer)
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@implements IDisposable
+@inject Frontend.Services.Interfaces.IApiGatewayClient ApiClient
+@inject ISnackbar Snackbar
+@inject IJSRuntime JsRuntime
+@inject ILogger<Frontend.Components.Pages.MyPage.DataExport> Logger
+
+<PageTitle>データエクスポート — Azure SkiShop</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack"
+               Href="/mypage" Class="mb-4">
+        マイページに戻る
+    </MudButton>
+
+    <MudPaper Elevation="4" Class="pa-8 rounded-lg">
+        <div class="text-center mb-6">
+            <MudIcon Icon="@Icons.Material.Filled.Download" Color="Color.Primary" Size="Size.Large" />
+            <MudText Typo="Typo.h4" Class="mt-2" Style="font-weight: 700; color: #1565C0;">
+                データエクスポート
+            </MudText>
+        </div>
+
+        <MudAlert Severity="Severity.Info" Class="mb-6">
+            お客様のアカウントに関連するすべてのデータ（プロフィール、注文履歴、ポイント履歴など）を
+            JSON 形式でダウンロードできます。データの準備には数分かかる場合があります。
+        </MudAlert>
+
+        @if (_isLoading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+        }
+        else if (_exportStatus is null)
+        {
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       Size="Size.Large"
+                       OnClick="HandleRequestExportAsync"
+                       Disabled="@_isRequesting"
+                       Style="min-height: 48px;">
+                @if (_isRequesting)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                エクスポートをリクエスト
+            </MudButton>
+        }
+        else
+        {
+            <MudPaper Elevation="0" Class="pa-6 mb-4" Style="background: #f5f5f5; border-radius: 8px;">
+                <MudText Typo="Typo.subtitle1" Class="mb-2" Style="font-weight: 600;">
+                    エクスポートステータス
+                </MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                    リクエスト日時: @_exportStatus.RequestedAt.ToString("yyyy/MM/dd HH:mm")
+                </MudText>
+
+                @switch (_exportStatus.Status.ToUpperInvariant())
+                {
+                    case "PENDING":
+                        <MudChip T="string" Color="Color.Warning" Size="Size.Small"
+                                 Icon="@Icons.Material.Filled.Schedule">
+                            受付済み
+                        </MudChip>
+                        <MudProgressLinear Indeterminate="true" Color="Color.Warning" Class="mt-4" />
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                            エクスポートの準備中です…
+                        </MudText>
+                        break;
+
+                    case "PROCESSING":
+                        <MudChip T="string" Color="Color.Info" Size="Size.Small"
+                                 Icon="@Icons.Material.Filled.HourglassTop">
+                            処理中
+                        </MudChip>
+                        <MudProgressLinear Indeterminate="true" Color="Color.Info" Class="mt-4" />
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                            データを収集しています。しばらくお待ちください…
+                        </MudText>
+                        break;
+
+                    case "COMPLETED":
+                        <MudChip T="string" Color="Color.Success" Size="Size.Small"
+                                 Icon="@Icons.Material.Filled.CheckCircle">
+                            完了
+                        </MudChip>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Success"
+                                   FullWidth="true"
+                                   Size="Size.Large"
+                                   StartIcon="@Icons.Material.Filled.Download"
+                                   OnClick="HandleDownloadAsync"
+                                   Disabled="@_isDownloading"
+                                   Class="mt-4"
+                                   Style="min-height: 48px;">
+                            @if (_isDownloading)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            }
+                            データをダウンロード
+                        </MudButton>
+                        break;
+
+                    default:
+                        <MudChip T="string" Color="Color.Error" Size="Size.Small"
+                                 Icon="@Icons.Material.Filled.Error">
+                            @_exportStatus.Status
+                        </MudChip>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   FullWidth="true"
+                                   Size="Size.Large"
+                                   OnClick="HandleRequestExportAsync"
+                                   Class="mt-4"
+                                   Style="min-height: 48px;">
+                            再リクエスト
+                        </MudButton>
+                        break;
+                }
+            </MudPaper>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private DataExportDto? _exportStatus;
+    private bool _isLoading = true;
+    private bool _isRequesting;
+    private bool _isDownloading;
+    private string? _userId;
+    private Timer? _pollingTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var profile = await ApiClient.GetAsync<UserProfileDto>("/api/v1/users/me");
+            _userId = profile?.Id;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "ユーザー情報の取得に失敗: {Message}", ex.Message);
+            Snackbar.Add("ユーザー情報の取得に失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleRequestExportAsync()
+    {
+        if (_userId is null) return;
+        _isRequesting = true;
+
+        try
+        {
+            _exportStatus = await ApiClient.PostAsync<object, DataExportDto>(
+                $"/api/v1/users/{_userId}/data-export", new { });
+
+            if (_exportStatus is not null)
+            {
+                Snackbar.Add("エクスポートをリクエストしました", Severity.Success);
+                StartPolling();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "エクスポートリクエストに失敗: {Message}", ex.Message);
+            Snackbar.Add("エクスポートリクエストに失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isRequesting = false;
+        }
+    }
+
+    private void StartPolling()
+    {
+        StopPolling();
+        _pollingTimer = new Timer(async _ => await PollStatusAsync(), null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+    }
+
+    private void StopPolling()
+    {
+        _pollingTimer?.Dispose();
+        _pollingTimer = null;
+    }
+
+    private async Task PollStatusAsync()
+    {
+        if (_userId is null || _exportStatus is null) return;
+
+        try
+        {
+            var status = await ApiClient.GetAsync<DataExportDto>(
+                $"/api/v1/users/{_userId}/data-export/{_exportStatus.RequestId}");
+
+            if (status is not null)
+            {
+                _exportStatus = status;
+                if (status.Status.Equals("COMPLETED", StringComparison.OrdinalIgnoreCase) ||
+                    status.Status.Equals("FAILED", StringComparison.OrdinalIgnoreCase))
+                {
+                    StopPolling();
+                }
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "エクスポートステータスのポーリングに失敗: {Message}", ex.Message);
+        }
+    }
+
+    private async Task HandleDownloadAsync()
+    {
+        if (_userId is null || _exportStatus is null) return;
+        _isDownloading = true;
+
+        try
+        {
+            var response = await ApiClient.SendAsync(
+                HttpMethod.Get,
+                $"/api/v1/users/{_userId}/data-export/{_exportStatus.RequestId}/download");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var bytes = await response.Content.ReadAsByteArrayAsync();
+                var base64 = Convert.ToBase64String(bytes);
+                await JsRuntime.InvokeVoidAsync("eval",
+                    $"const a=document.createElement('a');a.href='data:application/json;base64,{base64}';" +
+                    "a.download='skishop-data-export.json';document.body.appendChild(a);a.click();document.body.removeChild(a);");
+                Snackbar.Add("ダウンロードを開始しました", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "データダウンロードに失敗: {Message}", ex.Message);
+            Snackbar.Add("ダウンロードに失敗しました", Severity.Error);
+        }
+        finally
+        {
+            _isDownloading = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        StopPolling();
+    }
+
+    private record UserProfileDto(string Id, string Email, string Name, string? PhoneNumber, string Role, DateTime CreatedAt);
+    private record DataExportDto(string RequestId, string Status, DateTime RequestedAt, string? DownloadUrl);
+}

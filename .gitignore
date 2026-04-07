@@ -1,0 +1,140 @@
+############################
+# OS / Editor
+############################
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+############################
+# Visual Studio
+############################
+
+.vs/
+*.user
+*.userosscache
+*.suo
+*.cache
+*.log
+
+############################
+# Build results
+############################
+
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+############################
+# Test results
+############################
+
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+
+############################
+# NuGet
+############################
+
+# Packages
+*.nupkg
+*.snupkg
+# NuGet v3's cache is global, not per solution
+# (keep commented unless you really want to ignore global cache)
+# ~/.nuget/packages/
+
+############################
+# Publish / Artifacts
+############################
+
+publish/
+artifacts/
+
+############################
+# ASP.NET / Web
+############################
+
+wwwroot/
+wwwroot/**/*
+!wwwroot/.gitkeep
+
+# IIS
+iisexpress/
+*.publishsettings
+
+############################
+# User Secrets
+############################
+
+secrets.json
+*.secrets.json
+
+############################
+# Environment / Config
+############################
+
+appsettings.Development.json
+appsettings.Local.json
+.env
+.env.*
+
+############################
+# Database
+############################
+
+*.mdf
+*.ldf
+*.db
+*.db-shm
+*.db-wal
+
+############################
+# Rider / JetBrains
+############################
+
+.idea/
+*.sln.iml
+
+############################
+# Resharper
+############################
+
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+############################
+# Coverage tools
+############################
+
+coverage/
+coverage.*.xml
+*.opencover.xml
+
+############################
+# Misc
+############################
+
+*.tmp
+*.bak
+*.orig
+
+############################
+# Azure & Cloud
+############################
+
+.azure/
+.azure-pipelines/

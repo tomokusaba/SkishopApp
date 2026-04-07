@@ -1,0 +1,109 @@
+@page
+@model AdminPortal.Pages.Admin.Orders.IndexModel
+@{
+    ViewData["Title"] = "注文管理";
+    Layout = "/Pages/Admin/_Layout.cshtml";
+}
+
+<h2 class="mb-4">注文管理</h2>
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+}
+
+<form method="get" class="row g-2 mb-4 align-items-end">
+    <div class="col-md-2">
+        <label class="form-label">ステータス</label>
+        <select class="form-select" name="status">
+            <option value="">すべて</option>
+            <option value="Pending" selected="@(Model.StatusFilter == "Pending")">保留中</option>
+            <option value="Processing" selected="@(Model.StatusFilter == "Processing")">処理中</option>
+            <option value="Shipped" selected="@(Model.StatusFilter == "Shipped")">発送済</option>
+            <option value="Delivered" selected="@(Model.StatusFilter == "Delivered")">配達完了</option>
+            <option value="Cancelled" selected="@(Model.StatusFilter == "Cancelled")">キャンセル</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">開始日</label>
+        <input type="date" class="form-control" name="dateFrom" value="@Model.DateFrom" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">終了日</label>
+        <input type="date" class="form-control" name="dateTo" value="@Model.DateTo" />
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1"></i>フィルター</button>
+    </div>
+</form>
+
+<div class="table-responsive">
+    <table class="table table-dark table-striped table-hover">
+        <thead>
+            <tr>
+                <th>注文ID</th>
+                <th>顧客名</th>
+                <th>ステータス</th>
+                <th class="text-end">合計金額</th>
+                <th class="text-end">商品数</th>
+                <th>注文日</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Orders.Count == 0)
+            {
+                <tr><td colspan="7" class="text-center text-secondary py-4">注文データがありません</td></tr>
+            }
+            @foreach (var order in Model.Orders)
+            {
+                <tr>
+                    <td><code>@order.Id[..Math.Min(8, order.Id.Length)]</code></td>
+                    <td>@order.CustomerName</td>
+                    <td>
+                        @{
+                            var badgeClass = order.Status switch
+                            {
+                                "Pending" => "bg-warning text-dark",
+                                "Processing" => "bg-info text-dark",
+                                "Shipped" => "bg-primary",
+                                "Delivered" => "bg-success",
+                                "Cancelled" => "bg-danger",
+                                _ => "bg-secondary"
+                            };
+                        }
+                        <span class="badge @badgeClass">@order.Status</span>
+                    </td>
+                    <td class="text-end">¥@order.TotalAmount.ToString("N0")</td>
+                    <td class="text-end">@order.ItemCount</td>
+                    <td>@order.OrderDate.ToString("yyyy/MM/dd")</td>
+                    <td>
+                        <a href="/Admin/Orders/Detail?id=@order.Id" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i> 詳細
+                        </a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (Model.TotalPages > 1)
+{
+    <nav aria-label="注文ページネーション">
+        <ul class="pagination justify-content-center">
+            <li class="page-item @(Model.CurrentPage <= 1 ? "disabled" : "")">
+                <a class="page-link" href="/Admin/Orders?page=@(Model.CurrentPage - 1)&status=@Model.StatusFilter&dateFrom=@Model.DateFrom&dateTo=@Model.DateTo">&laquo;</a>
+            </li>
+            @for (var i = 1; i <= Model.TotalPages; i++)
+            {
+                <li class="page-item @(i == Model.CurrentPage ? "active" : "")">
+                    <a class="page-link" href="/Admin/Orders?page=@i&status=@Model.StatusFilter&dateFrom=@Model.DateFrom&dateTo=@Model.DateTo">@i</a>
+                </li>
+            }
+            <li class="page-item @(Model.CurrentPage >= Model.TotalPages ? "disabled" : "")">
+                <a class="page-link" href="/Admin/Orders?page=@(Model.CurrentPage + 1)&status=@Model.StatusFilter&dateFrom=@Model.DateFrom&dateTo=@Model.DateTo">&raquo;</a>
+            </li>
+        </ul>
+    </nav>
+}

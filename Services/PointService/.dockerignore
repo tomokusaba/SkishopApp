@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+.git/
+.github/
+*.md
+*.sln.DotSettings
+.idea/
+.vs/
+design-docs/
+impl-plan/
+**/*Tests/

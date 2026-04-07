@@ -1,0 +1,341 @@
+@page "/products/{Id}"
+@attribute [StreamRendering]
+@inject IProductApiClient ProductApi
+@inject IAiApiClient AiApi
+@inject IDialogService DialogService
+@inject IHttpContextAccessor HttpContextAccessor
+
+<PageTitle>@(_product?.Name ?? "商品詳細") - Azure SkiShop</PageTitle>
+
+@if (_product is not null)
+{
+    <HeadContent>
+        <meta name="description" content="@_product.Description" />
+        <meta property="og:title" content="@_product.Name - Azure SkiShop" />
+        <meta property="og:description" content="@_product.Description" />
+        <meta property="og:image" content="@(_product.ImageUrls?.FirstOrDefault())" />
+        <meta property="og:type" content="product" />
+        <script type="application/ld+json">
+        {
+            "@@context": "https://schema.org",
+            "@@type": "Product",
+            "name": "@_product.Name",
+            "description": "@_product.Description",
+            "image": "@(_product.ImageUrls?.FirstOrDefault())",
+            "offers": {
+                "@@type": "Offer",
+                "price": "@_product.Price",
+                "priceCurrency": "JPY",
+                "availability": "@(_product.StockQuantity > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock")"
+            },
+            "aggregateRating": {
+                "@@type": "AggregateRating",
+                "ratingValue": "@_product.AverageRating",
+                "reviewCount": "@_product.ReviewCount"
+            }
+        }
+        </script>
+    </HeadContent>
+}
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    @if (_product is null)
+    {
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" />
+    }
+    else
+    {
+        <!-- パンくずリスト -->
+        <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4" />
+
+        <MudGrid Spacing="6">
+            <!-- 画像ギャラリー -->
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="2" Class="pa-4" Style="border-radius: 12px;">
+                    <MudImage Src="@(_product.ImageUrls?.ElementAtOrDefault(_selectedImageIndex) ?? "/images/no-image.webp")"
+                              Alt="@_product.Name"
+                              Fluid="true"
+                              ObjectFit="ObjectFit.Contain"
+                              Style="max-height: 400px; width: 100%;" />
+                    @if ((_product.ImageUrls?.Count ?? 0) > 1)
+                    {
+                        <MudStack Row="true" Spacing="2" Class="mt-4" Justify="Justify.Center">
+                            @foreach (var (url, index) in _product.ImageUrls!.Select((u, i) => (u, i)))
+                            {
+                                <MudImage Src="@url" Alt="@($"{_product.Name} 画像 {index + 1}")"
+                                          Width="64" Height="64"
+                                          ObjectFit="ObjectFit.Cover"
+                                          Class="@($"cursor-pointer {(_selectedImageIndex == index ? "mud-border-primary" : "")}")"
+                                          Style="@($"border: 2px solid {(_selectedImageIndex == index ? "#1565C0" : "transparent")}; border-radius: 8px; cursor: pointer;")"
+                                          @onclick="@(() => _selectedImageIndex = index)" />
+                            }
+                        </MudStack>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <!-- 商品情報 -->
+            <MudItem xs="12" md="6">
+                <MudText Typo="Typo.caption" Color="Color.Primary" Class="mb-1">@_product.CategoryName</MudText>
+                <MudText Typo="Typo.h4" Class="mb-2" Style="font-weight: 700;">@_product.Name</MudText>
+
+                @if (_product.AverageRating > 0)
+                {
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
+                        <MudRating ReadOnly="true" SelectedValue="@((int)Math.Round(_product.AverageRating))" />
+                        <MudText Typo="Typo.body2">@_product.AverageRating.ToString("F1") (@_product.ReviewCount 件のレビュー)</MudText>
+                    </MudStack>
+                }
+
+                <div class="mb-4">
+                    @if (_product.OriginalPrice.HasValue && _product.OriginalPrice.Value > _product.Price)
+                    {
+                        <MudText Typo="Typo.body1" Style="text-decoration: line-through; color: #999;">
+                            ¥@_product.OriginalPrice.Value.ToString("N0")
+                        </MudText>
+                        <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Filled" Label="true">
+                            @($"{(int)((1 - _product.Price / _product.OriginalPrice.Value) * 100)}% OFF")
+                        </MudChip>
+                    }
+                    <MudText Typo="Typo.h4" Color="Color.Primary" Style="font-weight: 700;">
+                        ¥@_product.Price.ToString("N0") <MudText Typo="Typo.caption" Style="display: inline;">(税込)</MudText>
+                    </MudText>
+                </div>
+
+                <div class="mb-4">
+                    <Frontend.Components.Shared.StockBadge StockQuantity="@_product.StockQuantity" />
+                </div>
+
+                <!-- サイズ選択 -->
+                @if ((_product.Sizes?.Count ?? 0) > 0)
+                {
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">サイズ</MudText>
+                    <MudStack Row="true" Spacing="2" Class="mb-3">
+                        @foreach (var size in _product.Sizes!)
+                        {
+                            <MudButton Variant="@(_selectedSize == size ? Variant.Filled : Variant.Outlined)"
+                                       Color="Color.Primary" Size="Size.Small"
+                                       OnClick="@(() => _selectedSize = size)">
+                                @size
+                            </MudButton>
+                        }
+                    </MudStack>
+                    <MudLink OnClick="ShowSizeGuide" Typo="Typo.caption" Color="Color.Primary"
+                             Style="cursor: pointer;">
+                        <MudIcon Icon="@Icons.Material.Filled.Straighten" Size="Size.Small" /> サイズガイドを見る
+                    </MudLink>
+                }
+
+                <!-- カラー選択 -->
+                @if ((_product.Colors?.Count ?? 0) > 0)
+                {
+                    <MudText Typo="Typo.subtitle2" Class="mt-3 mb-2">カラー</MudText>
+                    <MudStack Row="true" Spacing="2" Class="mb-4">
+                        @foreach (var color in _product.Colors!)
+                        {
+                            <MudButton Variant="@(_selectedColor == color ? Variant.Filled : Variant.Outlined)"
+                                       Color="Color.Primary" Size="Size.Small"
+                                       OnClick="@(() => _selectedColor = color)">
+                                @color
+                            </MudButton>
+                        }
+                    </MudStack>
+                }
+
+                <!-- カートに追加 -->
+                <MudStack Row="true" Spacing="3" Class="mt-4">
+                    <MudNumericField T="int" @bind-Value="_quantity" Label="数量" Min="1" Max="99"
+                                     Variant="Variant.Outlined" Style="max-width: 100px;" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                               StartIcon="@Icons.Material.Filled.ShoppingCart"
+                               Disabled="@(_product.StockQuantity <= 0)"
+                               Style="flex: 1; border-radius: 28px;">
+                        カートに追加
+                    </MudButton>
+                </MudStack>
+
+                <!-- 商品説明 -->
+                <MudDivider Class="my-6" />
+                <MudText Typo="Typo.h6" Class="mb-3">商品説明</MudText>
+                <MudText Typo="Typo.body1" Style="line-height: 1.8; color: #424242;">
+                    @_product.Description
+                </MudText>
+            </MudItem>
+        </MudGrid>
+
+        <!-- レビューセクション -->
+        <MudDivider Class="my-8" />
+        <MudText Typo="Typo.h5" Class="mb-4" Style="font-weight: 600;">カスタマーレビュー</MudText>
+        @if (_reviews.Count > 0)
+        {
+            @foreach (var review in _reviews)
+            {
+                <MudPaper Elevation="1" Class="pa-4 mb-3" Style="border-radius: 8px;">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+                        <MudAvatar Color="Color.Primary" Size="Size.Small">@review.UserName[0]</MudAvatar>
+                        <MudText Typo="Typo.subtitle2">@review.UserName</MudText>
+                        <MudRating ReadOnly="true" SelectedValue="@review.Rating" Size="Size.Small" />
+                        <MudText Typo="Typo.caption" Style="color: #999;">@review.CreatedAt.ToString("yyyy/MM/dd")</MudText>
+                    </MudStack>
+                    <MudText Typo="Typo.body2">@review.Comment</MudText>
+                </MudPaper>
+            }
+        }
+        else
+        {
+            <MudText Typo="Typo.body1" Style="color: #999;">まだレビューがありません。</MudText>
+        }
+
+        <!-- AI レコメンデーション: similar -->
+        @if (_similarRecommendations.Count > 0)
+        {
+            <MudDivider Class="my-8" />
+            <MudText Typo="Typo.h5" Class="mb-2" Style="font-weight: 600;">
+                <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Style="vertical-align: middle;" /> 類似商品
+            </MudText>
+            <MudText Typo="Typo.body2" Class="mb-4" Style="color: #616161;">AI があなたにおすすめする類似商品</MudText>
+            <MudGrid Spacing="4">
+                @foreach (var rec in _similarRecommendations)
+                {
+                    <MudItem xs="6" sm="4" md="3">
+                        <MudCard Elevation="2" Style="border-radius: 12px; height: 100%;">
+                            <MudCardMedia Image="@rec.ImageUrl" Height="160" Style="object-fit: contain; background: #f5f5f5;" />
+                            <MudCardContent>
+                                <MudLink Href="@($"/products/{rec.ProductId}")" Underline="Underline.None" Color="Color.Inherit">
+                                    <MudText Typo="Typo.body2" Style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">@rec.ProductName</MudText>
+                                </MudLink>
+                                <MudText Typo="Typo.subtitle1" Color="Color.Primary" Class="mt-1">¥@rec.Price.ToString("N0")</MudText>
+                            </MudCardContent>
+                            <MudCardActions>
+                                <MudIconButton Icon="@Icons.Material.Filled.ThumbUp" Size="Size.Small" Color="Color.Success"
+                                               OnClick="@(() => SendFeedbackAsync(rec.ProductId, "similar", true))" aria-label="参考になった" />
+                                <MudIconButton Icon="@Icons.Material.Filled.ThumbDown" Size="Size.Small" Color="Color.Default"
+                                               OnClick="@(() => SendFeedbackAsync(rec.ProductId, "similar", false))" aria-label="参考にならなかった" />
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+
+        <!-- AI レコメンデーション: frequently-bought -->
+        @if (_frequentlyBoughtRecommendations.Count > 0)
+        {
+            <MudDivider Class="my-8" />
+            <MudText Typo="Typo.h5" Class="mb-2" Style="font-weight: 600;">
+                <MudIcon Icon="@Icons.Material.Filled.GroupWork" Style="vertical-align: middle;" /> よく一緒に購入される商品
+            </MudText>
+            <MudGrid Spacing="4">
+                @foreach (var rec in _frequentlyBoughtRecommendations)
+                {
+                    <MudItem xs="6" sm="4" md="3">
+                        <MudCard Elevation="2" Style="border-radius: 12px; height: 100%;">
+                            <MudCardMedia Image="@rec.ImageUrl" Height="160" Style="object-fit: contain; background: #f5f5f5;" />
+                            <MudCardContent>
+                                <MudLink Href="@($"/products/{rec.ProductId}")" Underline="Underline.None" Color="Color.Inherit">
+                                    <MudText Typo="Typo.body2" Style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">@rec.ProductName</MudText>
+                                </MudLink>
+                                <MudText Typo="Typo.subtitle1" Color="Color.Primary" Class="mt-1">¥@rec.Price.ToString("N0")</MudText>
+                            </MudCardContent>
+                            <MudCardActions>
+                                <MudIconButton Icon="@Icons.Material.Filled.ThumbUp" Size="Size.Small" Color="Color.Success"
+                                               OnClick="@(() => SendFeedbackAsync(rec.ProductId, "frequently-bought", true))" aria-label="参考になった" />
+                                <MudIconButton Icon="@Icons.Material.Filled.ThumbDown" Size="Size.Small" Color="Color.Default"
+                                               OnClick="@(() => SendFeedbackAsync(rec.ProductId, "frequently-bought", false))" aria-label="参考にならなかった" />
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+
+        <!-- フォールバック: AI 障害時に同カテゴリ商品を表示 -->
+        @if (_similarRecommendations.Count == 0 && _frequentlyBoughtRecommendations.Count == 0 && _fallbackProducts.Count > 0)
+        {
+            <MudDivider Class="my-8" />
+            <MudText Typo="Typo.h5" Class="mb-4" Style="font-weight: 600;">同じカテゴリの商品</MudText>
+            <MudGrid Spacing="4">
+                @foreach (var product in _fallbackProducts)
+                {
+                    <MudItem xs="6" sm="4" md="3">
+                        <Frontend.Components.Shared.ProductCard Product="product" />
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    }
+</MudContainer>
+
+@code {
+    [Parameter] public string Id { get; set; } = string.Empty;
+
+    private ProductDto? _product;
+    private List<ReviewDto> _reviews = [];
+    private List<AiRecommendationDto> _similarRecommendations = [];
+    private List<AiRecommendationDto> _frequentlyBoughtRecommendations = [];
+    private List<ProductDto> _fallbackProducts = [];
+    private List<BreadcrumbItem> _breadcrumbs = [];
+    private int _selectedImageIndex;
+    private string? _selectedSize;
+    private string? _selectedColor;
+    private int _quantity = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _product = await ProductApi.GetProductByIdAsync(Id);
+        if (_product is null) return;
+
+        _breadcrumbs =
+        [
+            new("ホーム", href: "/"),
+            new("商品一覧", href: "/products"),
+            new(_product.Name, href: null, disabled: true)
+        ];
+
+        _selectedSize = _product.Sizes?.FirstOrDefault();
+        _selectedColor = _product.Colors?.FirstOrDefault();
+
+        try
+        {
+            var reviewsTask = ProductApi.GetProductReviewsAsync(Id);
+            var similarTask = AiApi.GetSimilarAsync(Id, 4);
+            var frequentlyTask = AiApi.GetFrequentlyBoughtAsync(Id, 4);
+
+            await Task.WhenAll(reviewsTask, similarTask, frequentlyTask);
+
+            _reviews = await reviewsTask;
+            _similarRecommendations = await similarTask;
+            _frequentlyBoughtRecommendations = await frequentlyTask;
+
+            if (_similarRecommendations.Count == 0 && _frequentlyBoughtRecommendations.Count == 0)
+            {
+                _fallbackProducts = await ProductApi.GetProductsByCategoryAsync(_product.CategoryId, 4);
+            }
+        }
+        catch
+        {
+            // Reviews and recommendations are non-critical; show the product page without them
+        }
+    }
+
+    private async Task ShowSizeGuide()
+    {
+        if (_product is null) return;
+        var sizeGuide = await ProductApi.GetSizeGuideAsync(_product.CategoryId);
+        var parameters = new DialogParameters<Frontend.Components.Shared.SizeGuideModal>
+        {
+            { x => x.SizeGuide, sizeGuide }
+        };
+        await DialogService.ShowAsync<Frontend.Components.Shared.SizeGuideModal>("サイズガイド", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+    }
+
+    private async Task SendFeedbackAsync(string productId, string recommendationType, bool isPositive)
+    {
+        var isAuthenticated = HttpContextAccessor.HttpContext?.User?.Identity?.IsAuthenticated ?? false;
+        if (!isAuthenticated) return;
+
+        await AiApi.PostRecommendationFeedbackAsync(
+            new RecommendationFeedbackRequest(productId, recommendationType, isPositive));
+    }
+}

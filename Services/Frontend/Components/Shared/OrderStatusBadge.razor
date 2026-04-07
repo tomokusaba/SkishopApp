@@ -1,0 +1,68 @@
+@namespace Frontend.Components.Shared
+
+@* §15.6 準拠 — 8 つの注文ステータスに対応したバッジコンポーネント *@
+
+<MudChip T="string"
+         Color="@GetStatusColor()"
+         Size="Size.Small"
+         Icon="@GetStatusIcon()"
+         Style="@GetCustomStyle()">
+    @GetStatusLabel()
+</MudChip>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Status { get; set; } = string.Empty;
+
+    private string GetStatusLabel() => Status.ToUpperInvariant() switch
+    {
+        "PENDING" => "注文受付",
+        "CONFIRMED" => "注文確定",
+        "PREPARING" => "出荷準備中",
+        "SHIPPED" => "発送済み",
+        "DELIVERED" => "配達完了",
+        "CANCELLED" => "キャンセル",
+        "RETURNED" => "返品済み",
+        "REFUNDED" => "返金済み",
+        _ => Status
+    };
+
+    private Color GetStatusColor() => Status.ToUpperInvariant() switch
+    {
+        "PENDING" => Color.Warning,
+        "CONFIRMED" => Color.Info,
+        "PREPARING" => Color.Info,
+        "SHIPPED" => Color.Primary,
+        "DELIVERED" => Color.Success,
+        "CANCELLED" => Color.Error,
+        "RETURNED" => Color.Dark,
+        "REFUNDED" => Color.Default,
+        _ => Color.Default
+    };
+
+    private string GetStatusIcon() => Status.ToUpperInvariant() switch
+    {
+        "PENDING" => Icons.Material.Filled.Schedule,
+        "CONFIRMED" => Icons.Material.Filled.CheckCircle,
+        "PREPARING" => Icons.Material.Filled.Inventory,
+        "SHIPPED" => Icons.Material.Filled.LocalShipping,
+        "DELIVERED" => Icons.Material.Filled.Done,
+        "CANCELLED" => Icons.Material.Filled.Cancel,
+        "RETURNED" => Icons.Material.Filled.AssignmentReturn,
+        "REFUNDED" => Icons.Material.Filled.MoneyOff,
+        _ => Icons.Material.Filled.Info
+    };
+
+    private string? GetCustomStyle() => Status.ToUpperInvariant() switch
+    {
+        "PENDING" => "background-color: #FFF3E0; color: #E65100;",
+        "CONFIRMED" => "background-color: #E3F2FD; color: #1565C0;",
+        "PREPARING" => "background-color: #E8EAF6; color: #283593;",
+        "SHIPPED" => "background-color: #E1F5FE; color: #0277BD;",
+        "DELIVERED" => "background-color: #E8F5E9; color: #2E7D32;",
+        "CANCELLED" => "background-color: #FFEBEE; color: #C62828;",
+        "RETURNED" => "background-color: #EFEBE9; color: #4E342E;",
+        "REFUNDED" => "background-color: #F5F5F5; color: #616161;",
+        _ => null
+    };
+}
