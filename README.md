@@ -6,6 +6,7 @@
 
 - **Docker Desktop** 4.20+ (または Docker Engine 24+)
 - **Docker Compose** v2.20+
+- **.NET SDK** 10.0.x
 - **メモリ**: 最低 8GB（推奨 16GB）
 - **ディスク**: 20GB 以上の空き容量
 
@@ -19,8 +20,8 @@ Apple Silicon Mac では、一部のサービスで AMD64 エミュレーショ�
 ┌────────────────────────────────────────────────────────────────────────────────┐
 │                            Tier 3: フロントエンド                                │
 │  ┌──────────────────┐    ┌───────────────────────────────────────────────────┐ │
-│  │  Admin Panel     │    │           Frontend (Next.js)                      │ │
-│  │  :3001           │    │           :3000                                   │ │
+│  │  Admin Panel     │    │           Frontend (.NET)                         │ │
+│  │  :8081           │    │           :3000                                   │ │
 │  └──────────────────┘    └───────────────────────────────────────────────────┘ │
 └────────────────────────────────────────────────────────────────────────────────┘
                                          │
@@ -41,7 +42,7 @@ Apple Silicon Mac では、一部のサービスで AMD64 エミュレーショ�
 │  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘          │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐          │
 │  │ PaymentCart  │ │ Coupon       │ │ Point        │ │ MailSend     │          │
-│  │ :5005        │ │ :5006        │ │ :5007        │ │ :8080        │          │
+│  │ :5005        │ │ :5006        │ │ :5007        │ │ :5008        │          │
 │  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘          │
 │  ┌──────────────┐                                                              │
 │  │ AiSupport    │                                                              │
@@ -60,6 +61,44 @@ Apple Silicon Mac では、一部のサービスで AMD64 エミュレーショ�
 ```
 
 ## 🚀 起動手順
+
+### AppHost（Aspire）での起動
+
+Aspire 導入後の推奨起動方法です。AppHost が .NET サービス群を `AddProject` で起動し、PostgreSQL / Redis / Kafka / MailHog / Kafka UI / MCP Server もまとめてオーケストレーションします。
+
+```bash
+# ランタイム用 solution を復元
+dotnet restore SkiShop.slnx
+
+# AppHost を起動
+dotnet run --project AppHost\AppHost.csproj
+```
+
+- Aspire Dashboard: `http://localhost:17100`
+- Frontend: `http://localhost:3000`
+- Admin Panel: `http://localhost:8081`
+- API Gateway: `http://localhost:8080`
+- MCP Server: `http://localhost:5010/mcp`
+- Kafka UI: `http://localhost:8090`
+- MailHog: `http://localhost:8025`
+
+> `SkiShop.slnx` は AppHost と実行対象プロジェクトをまとめた solution です。テストプロジェクトは含めていません。
+>
+> MCP Server は `InventoryManagementService` の公開 read-only API を使って、商品検索（keyword/category/brand）と商品取得（id / sku）の tool を提供します。
+>
+> MCP Server へ接続するクライアントは `X-Api-Key` ヘッダーが必要です。固定キーで運用したい場合は AppHost の user-secrets に `Parameters:McpServerApiKey` を設定してください。
+
+```bash
+# 固定の MCP API key を設定（推奨）
+dotnet user-secrets --project AppHost\AppHost.csproj set "Parameters:McpServerApiKey" "<32文字以上のランダム文字列>"
+```
+
+```text
+MCP endpoint: http://localhost:5010/mcp
+Required header: X-Api-Key: <Parameters:McpServerApiKey の値>
+```
+
+### Docker Compose での起動（従来手順）
 
 ### 1. インフラストラクチャの起動
 
@@ -114,8 +153,9 @@ docker compose up -d postgres redis kafka auth-service user-management-service
 | サービス | URL | 用途 |
 |----------|-----|------|
 | Frontend | http://localhost:3000 | ユーザー向け EC サイト |
-| Admin Panel | http://localhost:3001 | 管理画面 |
+| Admin Panel | http://localhost:8081 | 管理画面 |
 | API Gateway | http://localhost:8080 | API エントリーポイント |
+| MCP Server | http://localhost:5010/mcp | MCP client / Copilot 接続先 |
 | Kafka UI | http://localhost:8090 | Kafka 管理画面 |
 | MailHog | http://localhost:8025 | メール確認（開発用） |
 | PostgreSQL | localhost:5432 | データベース |
@@ -367,6 +407,7 @@ docker compose exec auth-service dotnet ef database update
 ├── docker-compose.yml           # メインの構成ファイル（全サービス）
 ├── docker-compose.infra.yml     # インフラのみの構成ファイル（バックアップ）
 ├── docker-compose-make-plan.md  # 設計計画ドキュメント
+├── AppHost/                     # .NET Aspire AppHost
 ├── Services/
 │   ├── .dockerignore            # Docker ビルド除外設定
 │   ├── AuthService/
@@ -378,6 +419,7 @@ docker compose exec auth-service dotnet ef database update
 │   ├── PointService/
 │   ├── MailSendService/
 │   ├── AiSupportService/
+│   ├── McpServer/
 │   ├── ApiGateway/
 │   ├── AdminPanel/
 │   └── frontend/

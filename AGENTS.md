@@ -13,7 +13,7 @@
 | 言語 | C# 14 |
 | ランタイム | .NET 10 (LTS) |
 | フレームワーク | ASP.NET Core 10 (Minimal API) |
-| オーケストレーション | .NET Aspire 13.1 |
+| オーケストレーション | .NET Aspire 13.2.2 |
 | ORM | Entity Framework Core 10 |
 | DB | PostgreSQL（EF Core Migrations で管理） |
 | メッセージング | Apache Kafka (Confluent.Kafka) |
@@ -89,6 +89,7 @@ Endpoints（Controllers）→ Services → Repositories
 | `PointService` | ポイント管理 | 5007 |
 | `MailSendService` | メール送信 | 5008 |
 | `AiSupportService` | AI チャットボット（Semantic Kernel） | 5009 |
+| `McpServer` | MCP クライアント向け read-only catalog tools | 5010 |
 | `AppHost` | .NET Aspire オーケストレーション | — |
 
 ---

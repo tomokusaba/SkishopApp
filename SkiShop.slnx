@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/Services/">
+    <Project Path="Services/AdminPortal/AdminPortal.csproj" />
+    <Project Path="Services/AiSupportService/AiSupportService.csproj" />
+    <Project Path="Services/ApiGateway/ApiGateway.csproj" />
+    <Project Path="Services/AuthService/AuthService.csproj" />
+    <Project Path="Services/CouponService/CouponService.csproj" />
+    <Project Path="Services/Frontend/Frontend.csproj" />
+    <Project Path="Services/InventoryManagementService/InventoryManagementService.csproj" />
+    <Project Path="Services/MailSendService/MailSendService.csproj" />
+    <Project Path="Services/McpServer/McpServer.csproj" />
+    <Project Path="Services/PaymentCartService/PaymentCartService.csproj" />
+    <Project Path="Services/PointService/PointService.csproj" />
+    <Project Path="Services/SalesManagementService/SalesManagementService.csproj" />
+    <Project Path="Services/UserManagementService/UserManagementService.csproj" />
+  </Folder>
+  <Project Path="AppHost/AppHost.csproj" />
+</Solution>

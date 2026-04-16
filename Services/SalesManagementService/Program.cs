@@ -102,7 +102,17 @@ builder.Services.AddHostedService<SalesManagementService.Infrastructure.Kafka.Us
 builder.Services.AddHostedService<SalesManagementService.Infrastructure.Maintenance.IdempotencyKeyCleanupService>();
 builder.Services.AddHostedService<SalesManagementService.Infrastructure.Maintenance.SagaLogArchivalService>();
 
-if (builder.Environment.IsDevelopment())
+var inventoryGrpcAddress = builder.Configuration["GrpcEndpoints:Inventory"];
+var paymentGrpcAddress = builder.Configuration["GrpcEndpoints:Payment"];
+var cartGrpcAddress = builder.Configuration["GrpcEndpoints:Cart"];
+var pointGrpcAddress = builder.Configuration["GrpcEndpoints:Point"];
+var hasConfiguredGrpcEndpoints =
+    !string.IsNullOrWhiteSpace(inventoryGrpcAddress) &&
+    !string.IsNullOrWhiteSpace(paymentGrpcAddress) &&
+    !string.IsNullOrWhiteSpace(cartGrpcAddress) &&
+    !string.IsNullOrWhiteSpace(pointGrpcAddress);
+
+if (builder.Environment.IsDevelopment() && !hasConfiguredGrpcEndpoints)
 {
     builder.Services.AddScoped<SalesManagementService.Infrastructure.ExternalServices.IInventoryClient, SalesManagementService.Infrastructure.ExternalServices.DevelopmentInventoryClient>();
     builder.Services.AddScoped<SalesManagementService.Infrastructure.ExternalServices.ICartClient, SalesManagementService.Infrastructure.ExternalServices.DevelopmentCartClient>();
@@ -113,10 +123,10 @@ if (builder.Environment.IsDevelopment())
 else
 {
     // gRPC チャネルの登録
-    var inventoryGrpcAddress = builder.Configuration["GrpcEndpoints:Inventory"] ?? "http://localhost:15003";
-    var paymentGrpcAddress = builder.Configuration["GrpcEndpoints:Payment"] ?? "http://localhost:15005";
-    var cartGrpcAddress = builder.Configuration["GrpcEndpoints:Cart"] ?? "http://localhost:15005";
-    var pointGrpcAddress = builder.Configuration["GrpcEndpoints:Point"] ?? "http://localhost:15007";
+    inventoryGrpcAddress ??= "http://localhost:15003";
+    paymentGrpcAddress ??= "http://localhost:15005";
+    cartGrpcAddress ??= "http://localhost:15005";
+    pointGrpcAddress ??= "http://localhost:15007";
 
     builder.Services.AddSingleton(sp =>
         new InventoryManagementService.Protos.InventoryService.InventoryServiceClient(

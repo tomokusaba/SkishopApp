@@ -2,7 +2,7 @@
 
 ## システム概要
 
-スキー用品に特化した EC プラットフォーム。マイクロサービスアーキテクチャで構築され、.NET Aspire 13.1 によるオーケストレーションを採用している。  
+スキー用品に特化した EC プラットフォーム。マイクロサービスアーキテクチャで構築され、.NET Aspire 13.2.2 によるオーケストレーションを採用している。  
 季節性の高い需要に対応する柔軟なスケーリング機能と、Semantic Kernel を活用した AI によるパーソナライズされたショッピング体験を提供する。
 
 ## アーキテクチャ図
@@ -47,6 +47,8 @@
 │  メイン DB   │  キャッシュ │ メッセージング│                             │
 └─────────────┴─────────────┴─────────────┴─────────────────────────────┘
 ```
+
+> 補助アクセス経路として `McpServer`（Port: 5010）を配置し、MCP クライアントから `InventoryManagementService` の公開 read-only 商品 API を安全に利用できるようにする。
 
 ## マイクロサービス詳細構成
 
@@ -157,6 +159,15 @@
   - ユーザー行動分析
 - **技術**: Semantic Kernel 1.x, OpenAI API
 
+#### 11. McpServer（MCP サーバー）(Port: 5010)
+
+- **役割**: MCP クライアント向けの read-only tool endpoint
+- **機能**:
+  - 商品検索（keyword/category/brand, ページング）
+  - 商品取得（id / sku）
+  - `InventoryManagementService` への安全なプロキシ
+- **技術**: ASP.NET Core 10, ModelContextProtocol.AspNetCore, .NET Aspire 13.2.2
+
 ### インフラストラクチャサービス
 
 #### データベース
@@ -180,7 +191,7 @@
 ```text
 言語: C# 14 (.NET 10 LTS)
 フレームワーク: ASP.NET Core 10 (Minimal API)
-オーケストレーション: .NET Aspire 13.1
+オーケストレーション: .NET Aspire 13.2.2
 ORM: Entity Framework Core 10
 ビルドツール: dotnet CLI / MSBuild
 ```
@@ -258,6 +269,10 @@ DotNet-Skishop-App/
 │   ├── AiSupportService.csproj
 │   └── ...
 │
+├── McpServer/                         # MCP サーバー
+│   ├── McpServer.csproj
+│   └── ...
+│
 ├── design-docs/                       # 設計ドキュメント
 │   ├── spec.md                        # 仕様書
 │   ├── strategy.md                    # 戦略
@@ -314,7 +329,7 @@ DotNet-Skishop-App/
 
 - **ステートレス設計**: 全サービスがステートレス
 - **負荷分散**: API Gateway（YARP）経由
-- **オーケストレーション**: .NET Aspire 13.1 によるサービス管理
+- **オーケストレーション**: .NET Aspire 13.2.2 によるサービス管理
 
 ### データベース戦略
 

@@ -214,12 +214,17 @@ builder.Services.AddStackExchangeRedisCache(options =>
 builder.Services.AddScoped<ICacheService, CacheService>();
 
 // --- Health Checks ---
-builder.Services.AddHealthChecks()
+var healthChecks = builder.Services.AddHealthChecks()
     .AddNpgSql(connectionString, name: "postgresql", tags: ["ready"])
     .AddRedis(redisConnectionString, name: "redis", tags: ["ready"])
-    .AddCheck<AiSupportService.Infrastructure.HealthChecks.KafkaHealthCheck>("kafka", tags: ["ready"])
-    .AddCheck<AiSupportService.Infrastructure.HealthChecks.AzureOpenAIHealthCheck>("azure-openai", tags: ["ready"])
-    .AddCheck<AiSupportService.Infrastructure.HealthChecks.AzureAISearchHealthCheck>("azure-ai-search", tags: ["ready"]);
+    .AddCheck<AiSupportService.Infrastructure.HealthChecks.KafkaHealthCheck>("kafka", tags: ["ready"]);
+
+if (!builder.Environment.IsDevelopment())
+{
+    healthChecks
+        .AddCheck<AiSupportService.Infrastructure.HealthChecks.AzureOpenAIHealthCheck>("azure-openai", tags: ["ready"])
+        .AddCheck<AiSupportService.Infrastructure.HealthChecks.AzureAISearchHealthCheck>("azure-ai-search", tags: ["ready"]);
+}
 
 // --- Exception Handler ---
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
